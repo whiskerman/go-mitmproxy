@@ -629,7 +629,6 @@ const (
 	ExtKeyUsageOCSPSigning
 	ExtKeyUsageMicrosoftServerGatedCrypto
 	ExtKeyUsageNetscapeServerGatedCrypto
-	ExtKeyUsageMicrosoftCommercialCodeSigning
 )
 
 // extKeyUsageOIDs contains the mapping between an ExtKeyUsage and its OID.

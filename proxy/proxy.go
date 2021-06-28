@@ -5,8 +5,9 @@ import (
 	//"crypto/tls"
 	"io"
 	"net"
-	"net/http"
 	"time"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	_log "github.com/sirupsen/logrus"
 	"github.com/whiskerman/gm-tls/src/tls"
