@@ -1,11 +1,13 @@
 package proxy
 
 import (
-	"crypto/tls"
+	//"crypto/tls"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"strings"
+
+	"github.com/whiskerman/gm-tls/src/tls"
 )
 
 // 当前仅做了转发 websocket 流量

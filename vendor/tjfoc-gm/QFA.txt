@@ -1,0 +1,22 @@
+
+1
+go.mod github.com/golang/protobuf v1.4.2 依赖google.golang.org/protobuf
+导致下游编译失败问题
+修改
+go.mod github.com/golang/protobuf v1.3.3
+
+liuhy@liuhy:~/work/src/github.com/hyperledger/tjfoc-gm$ grep -nr "google.golang.org/protobuf" ./
+Binary file ./.git/index matches
+./vendor/modules.txt:80:# google.golang.org/protobuf v1.23.0
+./vendor/modules.txt:81:google.golang.org/protobuf/encoding/prototext
+./vendor/modules.txt:82:google.golang.org/protobuf/encoding/protowire
+./vendor/modules.txt:83:google.golang.org/protobuf/internal/descfmt
+./vendor/modules.txt:84:google.golang.org/protobuf/internal/descopts
+./vendor/modules.txt:85:google.golang.org/protobuf/internal/detrand
+./vendor/modules.txt:86:google.golang.org/protobuf/internal/encoding/defval
+./vendor/modules.txt:87:google.golang.org/protobuf/internal/encoding/messageset
+./vendor/modules.txt:88:google.golang.org/protobuf/internal/encoding/tag
+./vendor/modules.txt:89:google.golang.org/protobuf/internal/encoding/text
+./vendor/modules.txt:90:google.golang.org/protobuf/internal/errors
+./vendor/modules.txt:91:google.golang.org/protobuf/internal/fieldnum
+

@@ -2,13 +2,14 @@ package proxy
 
 import (
 	"bytes"
-	"crypto/tls"
+	//"crypto/tls"
 	"io"
 	"net"
 	"net/http"
 	"time"
 
 	_log "github.com/sirupsen/logrus"
+	"github.com/whiskerman/gm-tls/src/tls"
 	"github.com/whiskerman/go-mitmproxy/addon"
 	"github.com/whiskerman/go-mitmproxy/flow"
 )

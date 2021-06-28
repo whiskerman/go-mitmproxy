@@ -1,0 +1,33 @@
+# github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
+## explicit
+github.com/golang/groupcache/lru
+github.com/golang/groupcache/singleflight
+# github.com/jordwest/mock-conn v0.0.0-20180617021051-4896c6bd1641
+## explicit
+github.com/jordwest/mock-conn
+# github.com/sirupsen/logrus v1.8.1
+## explicit
+github.com/sirupsen/logrus
+# github.com/stretchr/testify v1.4.0
+## explicit
+# github.com/whiskerman/gm-tls v1.0.0
+## explicit
+github.com/whiskerman/gm-tls/src/sm2
+github.com/whiskerman/gm-tls/src/sm3
+github.com/whiskerman/gm-tls/src/sm4
+github.com/whiskerman/gm-tls/src/tls
+github.com/whiskerman/gm-tls/src/x509
+# golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/chacha20poly1305
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/curve25519/internal/field
+golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/poly1305
+# golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
+golang.org/x/sys/cpu
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/yaml.v2 v2.2.4
+## explicit

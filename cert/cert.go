@@ -5,7 +5,7 @@ import (
 	"crypto/rsa"
 
 	//"crypto/tls"
-	//"crypto/x509"
+	sx509 "crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
@@ -211,7 +211,7 @@ func (ca *CA) create() error {
 }
 
 func (ca *CA) saveTo(out io.Writer) error {
-	keyBytes, err := x509.MarshalPKCS8PrivateKey(&ca.PrivateKey)
+	keyBytes, err := sx509.MarshalPKCS8PrivateKey(&ca.PrivateKey)
 	if err != nil {
 		return err
 	}

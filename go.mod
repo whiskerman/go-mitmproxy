@@ -7,5 +7,6 @@ require (
 	github.com/jordwest/mock-conn v0.0.0-20180617021051-4896c6bd1641
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.4.0 // indirect
+	github.com/whiskerman/gm-tls v1.0.0
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 )

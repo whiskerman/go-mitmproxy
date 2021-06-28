@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"bufio"
-	"crypto/tls"
+	//"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	mock_conn "github.com/jordwest/mock-conn"
+	"github.com/whiskerman/gm-tls/src/tls"
 	"github.com/whiskerman/go-mitmproxy/cert"
 )
 
