@@ -3,8 +3,9 @@ package cert
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
+
+	//"crypto/tls"
+	//"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
@@ -19,6 +20,8 @@ import (
 	"github.com/golang/groupcache/lru"
 	"github.com/golang/groupcache/singleflight"
 	_log "github.com/sirupsen/logrus"
+	"github.com/whiskerman/gm-tls/src/tls"
+	"github.com/whiskerman/gm-tls/src/x509"
 )
 
 var log = _log.WithField("at", "cert")
