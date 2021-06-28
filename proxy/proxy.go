@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lqqyt2423/go-mitmproxy/addon"
-	"github.com/lqqyt2423/go-mitmproxy/flow"
 	_log "github.com/sirupsen/logrus"
+	"github.com/whiskerman/go-mitmproxy/addon"
+	"github.com/whiskerman/go-mitmproxy/flow"
 )
 
 var log = _log.WithField("at", "proxy")

@@ -4,9 +4,9 @@ import (
 	"flag"
 	"os"
 
-	"github.com/lqqyt2423/go-mitmproxy/addon"
-	"github.com/lqqyt2423/go-mitmproxy/proxy"
 	log "github.com/sirupsen/logrus"
+	"github.com/whiskerman/go-mitmproxy/addon"
+	"github.com/whiskerman/go-mitmproxy/proxy"
 )
 
 type Config struct {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/lqqyt2423/go-mitmproxy/flow"
+	"github.com/whiskerman/go-mitmproxy/flow"
 )
 
 type Dumper struct {

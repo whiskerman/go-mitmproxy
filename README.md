@@ -18,7 +18,7 @@
 ## 安装
 
 ```
-go get github.com/lqqyt2423/go-mitmproxy/cmd/mitmproxy
+go get github.com/whiskerman/go-mitmproxy/cmd/mitmproxy
 ```
 
 ## 命令行使用
