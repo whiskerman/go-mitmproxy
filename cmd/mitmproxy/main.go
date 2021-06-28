@@ -27,7 +27,7 @@ func loadConfig() *Config {
 }
 
 func main() {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.DebugLevel)
 	log.SetReportCaller(false)
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.TextFormatter{
