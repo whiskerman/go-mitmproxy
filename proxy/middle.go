@@ -5,10 +5,11 @@ import (
 	//"crypto/tls"
 	"errors"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	mock_conn "github.com/jordwest/mock-conn"
 	"github.com/whiskerman/gm-tls/src/tls"
@@ -173,6 +174,8 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		Handler:      m,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
 		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			GMSupport:          &tls.GMSupport{},
 			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				log.Debugf("Middle GetCertificate ServerName: %v\n", chi.ServerName)
 				return ca.GetCert(chi.ServerName)
@@ -227,6 +230,8 @@ func (m *Middle) intercept(serverConn *connBuf) {
 
 	if buf[0] == 0x16 && buf[1] == 0x03 && (buf[2] >= 0x0 || buf[2] <= 0x03) {
 		// tls
+		m.Listener.(*listener).connChan <- serverConn
+	} else if buf[0] == 0x16 && buf[1] == 0x01 && (buf[2] >= 0x0 || buf[2] <= 0x03) {
 		m.Listener.(*listener).connChan <- serverConn
 	} else {
 		// ws

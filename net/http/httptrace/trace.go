@@ -8,12 +8,14 @@ package httptrace
 
 import (
 	"context"
-	"crypto/tls"
-	"internal/nettrace"
+	//"crypto/tls"
+	//"internal/nettrace"
 	"net"
 	"net/textproto"
 	"reflect"
 	"time"
+
+	"github.com/whiskerman/gm-tls/src/tls"
 )
 
 // unique type to prevent assignment.
@@ -40,7 +42,7 @@ func WithClientTrace(ctx context.Context, trace *ClientTrace) context.Context {
 
 	ctx = context.WithValue(ctx, clientEventContextKey{}, trace)
 	if trace.hasNetHooks() {
-		nt := &nettrace.Trace{
+		nt := &Trace{
 			ConnectStart: trace.ConnectStart,
 			ConnectDone:  trace.ConnectDone,
 		}
@@ -62,7 +64,7 @@ func WithClientTrace(ctx context.Context, trace *ClientTrace) context.Context {
 				})
 			}
 		}
-		ctx = context.WithValue(ctx, nettrace.TraceKey{}, nt)
+		ctx = context.WithValue(ctx, TraceKey{}, nt)
 	}
 	return ctx
 }
@@ -77,6 +79,39 @@ func WithClientTrace(ctx context.Context, trace *ClientTrace) context.Context {
 // of redirected requests.
 //
 // See https://blog.golang.org/http-tracing for more.
+type TraceKey struct{}
+
+// LookupIPAltResolverKey is a context.Context Value key used by tests to
+// specify an alternate resolver func.
+// It is not exposed to outsider users. (But see issue 12503)
+// The value should be the same type as lookupIP:
+//     func lookupIP(ctx context.Context, host string) ([]IPAddr, error)
+type LookupIPAltResolverKey struct{}
+
+// Trace contains a set of hooks for tracing events within
+// the net package. Any specific hook may be nil.
+type Trace struct {
+	// DNSStart is called with the hostname of a DNS lookup
+	// before it begins.
+	DNSStart func(name string)
+
+	// DNSDone is called after a DNS lookup completes (or fails).
+	// The coalesced parameter is whether singleflight de-dupped
+	// the call. The addrs are of type net.IPAddr but can't
+	// actually be for circular dependency reasons.
+	DNSDone func(netIPs []interface{}, coalesced bool, err error)
+
+	// ConnectStart is called before a Dial, excluding Dials made
+	// during DNS lookups. In the case of DualStack (Happy Eyeballs)
+	// dialing, this may be called multiple times, from multiple
+	// goroutines.
+	ConnectStart func(network, addr string)
+
+	// ConnectStart is called after a Dial with the results, excluding
+	// Dials made during DNS lookups. It may also be called multiple
+	// times, like ConnectStart.
+	ConnectDone func(network, addr string, err error)
+}
 type ClientTrace struct {
 	// GetConn is called before a connection is created or
 	// retrieved from an idle pool. The hostPort is the

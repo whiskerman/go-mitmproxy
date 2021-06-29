@@ -3,9 +3,10 @@ package proxy
 import (
 	//"crypto/tls"
 	"net"
-	"net/http"
-	"net/http/httputil"
 	"strings"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
+	"github.com/whiskerman/go-mitmproxy/net/http/httputil"
 
 	"github.com/whiskerman/gm-tls/src/tls"
 )
@@ -26,6 +27,7 @@ func (s *WebSocket) WS(conn net.Conn, host string) {
 		return
 	}
 	defer remoteConn.Close()
+	log.Debug("WebSocket transfer....")
 	Transfer(log, conn, remoteConn)
 }
 
@@ -63,5 +65,6 @@ func (s *WebSocket) WSS(res http.ResponseWriter, req *http.Request) {
 		log.Errorf("wss upgrade: %v\n", err)
 		return
 	}
+	log.Debug("websocket security transfer....")
 	Transfer(log, conn, cconn)
 }

@@ -554,12 +554,14 @@ type RecordHeaderError struct {
 	// RecordHeader contains the five bytes of TLS record header that
 	// triggered the error.
 	RecordHeader [5]byte
+	Conn         net.Conn
 }
 
 func (e RecordHeaderError) Error() string { return "tls: " + e.Msg }
 
-func (c *Conn) newRecordHeaderError(msg string) (err RecordHeaderError) {
+func (c *Conn) newRecordHeaderError(conn net.Conn, msg string) (err RecordHeaderError) {
 	err.Msg = msg
+	err.Conn = conn
 	copy(err.RecordHeader[:], c.rawInput.data)
 	return err
 }
@@ -615,7 +617,7 @@ Again:
 	// an SSLv2 client.
 	if want == recordTypeHandshake && typ == 0x80 {
 		c.sendAlert(alertProtocolVersion)
-		return c.in.setErrorLocked(c.newRecordHeaderError("unsupported SSLv2 handshake received"))
+		return c.in.setErrorLocked(c.newRecordHeaderError(nil, "unsupported SSLv2 handshake received"))
 	}
 
 	vers := uint16(b.data[1])<<8 | uint16(b.data[2])
@@ -623,12 +625,12 @@ Again:
 	if c.haveVers && vers != c.vers {
 		c.sendAlert(alertProtocolVersion)
 		msg := fmt.Sprintf("received record with version %x when expecting version %x", vers, c.vers)
-		return c.in.setErrorLocked(c.newRecordHeaderError(msg))
+		return c.in.setErrorLocked(c.newRecordHeaderError(nil, msg))
 	}
 	if n > maxCiphertext {
 		c.sendAlert(alertRecordOverflow)
 		msg := fmt.Sprintf("oversized record received with length %d", n)
-		return c.in.setErrorLocked(c.newRecordHeaderError(msg))
+		return c.in.setErrorLocked(c.newRecordHeaderError(nil, msg))
 	}
 	if !c.haveVers {
 		// First message, be extra suspicious: this might not be a TLS
@@ -637,7 +639,7 @@ Again:
 		// it's probably not real.
 		if (typ != recordTypeAlert && typ != want) || vers >= 0x1000 {
 			c.sendAlert(alertUnexpectedMessage)
-			return c.in.setErrorLocked(c.newRecordHeaderError("first record does not look like a TLS handshake"))
+			return c.in.setErrorLocked(c.newRecordHeaderError(c.conn, "first record does not look like a TLS handshake"))
 		}
 	}
 	if err := b.readFromUntil(c.conn, recordHeaderLen+n); err != nil {

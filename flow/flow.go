@@ -1,8 +1,9 @@
 package flow
 
 import (
-	"net/http"
 	"net/url"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	_log "github.com/sirupsen/logrus"
 )

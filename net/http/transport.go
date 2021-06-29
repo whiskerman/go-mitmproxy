@@ -21,7 +21,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http/httptrace"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/whiskerman/go-mitmproxy/net/http/httptrace"
 
 	"github.com/whiskerman/gm-tls/src/tls"
 	"golang.org/x/net/http/httpguts"
