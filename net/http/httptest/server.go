@@ -7,8 +7,8 @@
 package httptest
 
 import (
-	"crypto/tls"
-	"crypto/x509"
+	//"crypto/tls"
+	//"crypto/x509"
 	"flag"
 	"fmt"
 	"log"
@@ -19,6 +19,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/whiskerman/gm-tls/src/tls"
+	"github.com/whiskerman/gm-tls/src/x509"
 )
 
 // A Server is an HTTP server listening on a system-chosen port on the
