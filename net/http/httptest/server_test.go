@@ -8,7 +8,7 @@ import (
 	"bufio"
 	"io"
 	"net"
-	"net/http"
+	"github.com/whiskerman/go-mitmproxy/net/http"
 	"testing"
 )
 

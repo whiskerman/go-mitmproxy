@@ -13,12 +13,13 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
-	"net/http/internal"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
+	"github.com/whiskerman/go-mitmproxy/net/http/internal"
 
 	"github.com/whiskerman/gm-tls/src/tls"
 	"github.com/whiskerman/gm-tls/src/x509"
