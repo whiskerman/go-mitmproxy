@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // A Client is an HTTP client. Its zero value (DefaultClient) is a

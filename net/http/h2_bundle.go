@@ -28,7 +28,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"io"
 	"io/ioutil"
 	"log"

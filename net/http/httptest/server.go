@@ -21,8 +21,8 @@ import (
 	"github.com/whiskerman/go-mitmproxy/net/http"
 	"github.com/whiskerman/go-mitmproxy/net/http/internal"
 
-	"github.com/whiskerman/gm-tls/src/tls"
-	"github.com/whiskerman/gm-tls/src/x509"
+	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/gmsm/x509"
 )
 
 // A Server is an HTTP server listening on a system-chosen port on the

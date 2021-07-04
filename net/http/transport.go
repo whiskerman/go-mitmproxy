@@ -32,7 +32,7 @@ import (
 
 	"github.com/whiskerman/go-mitmproxy/net/http/httptrace"
 
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http/httpproxy"
 )

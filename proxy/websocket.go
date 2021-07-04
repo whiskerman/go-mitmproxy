@@ -8,7 +8,7 @@ import (
 	"github.com/whiskerman/go-mitmproxy/net/http"
 	"github.com/whiskerman/go-mitmproxy/net/http/httputil"
 
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // 当前仅做了转发 websocket 流量

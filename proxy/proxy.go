@@ -3,6 +3,8 @@ package proxy
 import (
 	"bytes"
 
+	tls "github.com/whiskerman/gmsm/gmtls"
+
 	"fmt"
 
 	//"crypto/tls"
@@ -15,8 +17,7 @@ import (
 	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	_log "github.com/sirupsen/logrus"
-	"github.com/whiskerman/gm-tls/src/tls"
-	"github.com/whiskerman/gm-tls/src/x509"
+	"github.com/whiskerman/gmsm/x509"
 	"github.com/whiskerman/go-mitmproxy/addon"
 	"github.com/whiskerman/go-mitmproxy/flow"
 )

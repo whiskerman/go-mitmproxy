@@ -3,8 +3,8 @@ package websvr
 import (
 	"io/ioutil"
 
-	"github.com/whiskerman/gm-tls/src/tls"
-	"github.com/whiskerman/gm-tls/src/x509"
+	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/gmsm/x509"
 
 	x "crypto/x509"
 )

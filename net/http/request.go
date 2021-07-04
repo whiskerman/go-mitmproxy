@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 
 	"golang.org/x/net/idna"
 )

@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // unique type to prevent assignment.

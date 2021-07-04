@@ -12,7 +12,7 @@ import (
 	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	mock_conn "github.com/jordwest/mock-conn"
-	"github.com/whiskerman/gm-tls/src/tls"
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"github.com/whiskerman/go-mitmproxy/cert"
 )
 
@@ -176,10 +176,12 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify: true,
 			GMSupport:          &tls.GMSupport{},
-			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				log.Debugf("Middle GetCertificate ServerName: %v\n", chi.ServerName)
-				return ca.GetCert(chi.ServerName)
-			},
+			/*
+				GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
+					log.Debugf("Middle GetCertificate ServerName: %v\n", chi.ServerName)
+					return ca.GetCert(chi.ServerName)
+				},
+			*/
 		},
 	}
 
