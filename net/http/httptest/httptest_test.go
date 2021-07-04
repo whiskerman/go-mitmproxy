@@ -5,13 +5,14 @@
 package httptest
 
 import (
-	"crypto/tls"
 	"io"
-	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/go-mitmproxy/net/http"
 )
 
 func TestNewRequest(t *testing.T) {

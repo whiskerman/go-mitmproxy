@@ -14,8 +14,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
@@ -25,6 +23,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	http "github.com/whiskerman/go-mitmproxy/net/http"
+	httptest "github.com/whiskerman/go-mitmproxy/net/http/httptest"
 )
 
 const fakeHopHeader = "X-Fake-Hop-Header-For-Test"

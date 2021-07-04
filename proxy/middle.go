@@ -2,10 +2,12 @@ package proxy
 
 import (
 	"bufio"
-	"crypto/tls"
 	"net"
-	"net/http"
 	"strings"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
 
 	"github.com/whiskerman/go-mitmproxy/cert"
 )
@@ -76,7 +78,7 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		TLSConfig: &tls.Config{
 			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				log.Debugf("Middle GetCertificate ServerName: %v\n", chi.ServerName)
-				return ca.GetCert(chi.ServerName)
+				return nil, nil //ca.GetCert(chi.ServerName)
 			},
 		},
 	}

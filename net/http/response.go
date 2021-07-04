@@ -10,7 +10,7 @@ import (
 	"bufio"
 	"bytes"
 
-	//"crypto/tls"
+	//"github.com/whiskerman/gmsm/gmtls"
 	"errors"
 	"fmt"
 	"io"

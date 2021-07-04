@@ -6,7 +6,7 @@ import (
 	tls "github.com/whiskerman/gmsm/gmtls"
 	"github.com/whiskerman/gmsm/x509"
 
-	x "crypto/x509"
+	x "github.com/whiskerman/gmsm/x509"
 )
 
 const (

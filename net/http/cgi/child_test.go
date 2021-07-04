@@ -9,10 +9,11 @@ package cgi
 import (
 	"bufio"
 	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
+	"github.com/whiskerman/go-mitmproxy/net/http/httptest"
 )
 
 func TestRequest(t *testing.T) {

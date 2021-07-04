@@ -14,13 +14,15 @@ import (
 	"fmt"
 	"internal/testenv"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	httptest "github.com/whiskerman/go-mitmproxy/net/http/httptest"
+
+	http "github.com/whiskerman/go-mitmproxy/net/http"
 )
 
 // This test is a CGI host (testing host.go) that runs its own binary

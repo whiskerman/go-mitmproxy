@@ -20,7 +20,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"net/textproto"
 	"os"
 	"os/exec"
@@ -30,7 +29,8 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/http/httpguts"
+	http "github.com/whiskerman/go-mitmproxy/net/http"
+	httpguts "golang.org/x/net/http/httpguts"
 )
 
 var trailingPort = regexp.MustCompile(`:([0-9]+)$`)

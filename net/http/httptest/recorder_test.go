@@ -7,8 +7,9 @@ package httptest
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"testing"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 )
 
 func TestRecorder(t *testing.T) {

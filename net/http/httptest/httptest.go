@@ -8,10 +8,12 @@ package httptest
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"io"
-	"net/http"
 	"strings"
+
+	http "github.com/whiskerman/go-mitmproxy/net/http"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // NewRequest returns a new incoming server Request, suitable

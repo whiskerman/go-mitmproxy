@@ -12,12 +12,13 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"net/textproto"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 
 	"golang.org/x/net/http/httpguts"
 )

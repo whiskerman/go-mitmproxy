@@ -9,16 +9,18 @@ package cgi
 
 import (
 	"bufio"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // Request returns the HTTP request as represented in the current

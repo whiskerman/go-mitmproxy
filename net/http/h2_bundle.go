@@ -24,7 +24,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/rand"
-	//"crypto/tls"
+	//"github.com/whiskerman/gmsm/gmtls"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -4927,7 +4927,7 @@ func (sc *http2serverConn) processFrameFromReader(res http2readFrameResult) bool
 			// (e.g. CloseWrite) because they're done
 			// sending frames but they're still wanting
 			// our open replies?  Investigate.
-			// TODO: add CloseWrite to crypto/tls.Conn first
+			// TODO: add CloseWrite to github.com/whiskerman/gmsm/gmtls.Conn first
 			// so we have a way to test this? I suppose
 			// just for testing we could have a non-TLS mode.
 			return false
@@ -7168,7 +7168,7 @@ func (t *http2Transport) newClientConn(c net.Conn, singleUse bool) (*http2Client
 	cc.flow.add(int32(http2initialWindowSize))
 
 	// TODO: adjust this writer size to account for frame size +
-	// MTU + crypto/tls record padding.
+	// MTU + github.com/whiskerman/gmsm/gmtls record padding.
 	cc.bw = bufio.NewWriter(http2stickyErrWriter{c, &cc.werr})
 	cc.br = bufio.NewReader(c)
 	cc.fr = http2NewFramer(cc.bw, cc.br)

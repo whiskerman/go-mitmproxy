@@ -9,9 +9,10 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
 	"net/textproto"
 	"sync"
+
+	"github.com/whiskerman/go-mitmproxy/net/http"
 )
 
 var (

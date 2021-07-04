@@ -2,11 +2,13 @@ package proxy
 
 import (
 	"bytes"
-	"crypto/tls"
 	"io"
 	"net"
-	"net/http"
 	"time"
+
+	http "github.com/whiskerman/go-mitmproxy/net/http"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
 
 	_log "github.com/sirupsen/logrus"
 	"github.com/whiskerman/go-mitmproxy/addon"
