@@ -6,11 +6,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/whiskerman/go-mitmproxy/addon"
+	"github.com/whiskerman/go-mitmproxy/addon/web"
 	"github.com/whiskerman/go-mitmproxy/proxy"
 )
 
+const version = "0.0.4"
+
 type Config struct {
 	addr      string
+	webAddr   string
 	dump      string // dump filename
 	dumpLevel int    // dump level
 }
@@ -19,6 +23,7 @@ func loadConfig() *Config {
 	config := new(Config)
 
 	flag.StringVar(&config.addr, "addr", ":9080", "proxy listen addr")
+	flag.StringVar(&config.webAddr, "web_addr", ":9081", "web interface listen addr")
 	flag.StringVar(&config.dump, "dump", "", "dump filename")
 	flag.IntVar(&config.dumpLevel, "dump_level", 0, "dump level: 0 - header, 1 - header + body")
 	flag.Parse()
@@ -27,12 +32,14 @@ func loadConfig() *Config {
 }
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	log.SetReportCaller(false)
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
+
+	log.Infof("go-mitmproxy version %v\n", version)
 
 	config := loadConfig()
 
@@ -50,6 +57,8 @@ func main() {
 		dumper := addon.NewDumper(config.dump, config.dumpLevel)
 		p.AddAddon(dumper)
 	}
+
+	p.AddAddon(web.NewWebAddon(config.webAddr))
 
 	log.Fatal(p.Start())
 }

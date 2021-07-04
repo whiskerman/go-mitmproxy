@@ -2,22 +2,13 @@ package proxy
 
 import (
 	"bytes"
-
-	tls "github.com/whiskerman/gmsm/gmtls"
-
-	"fmt"
-
-	//"crypto/tls"
-	"context"
+	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net"
+	"net/http"
 	"time"
 
-	"github.com/whiskerman/go-mitmproxy/net/http"
-
 	_log "github.com/sirupsen/logrus"
-	"github.com/whiskerman/gmsm/x509"
 	"github.com/whiskerman/go-mitmproxy/addon"
 	"github.com/whiskerman/go-mitmproxy/flow"
 )
@@ -39,14 +30,6 @@ type Proxy struct {
 
 func NewProxy(opts *Options) (*Proxy, error) {
 	proxy := new(Proxy)
-	root1, _ := ioutil.ReadFile("/home/securitydev/workspace/GmSSL/apps/gmca/.ca/cacert.pem")
-	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(root1)
-	c := &tls.Config{InsecureSkipVerify: true} //		GMSupport: &gmtls.GMSupport{},
-
-	//c.CipherSuites = append(c.CipherSuites, gmtls.GMTLS_SM2_WITH_SM4_SM3, gmtls.GMTLS_ECDHE_SM2_WITH_SM4_SM3)
-	//c.MinVersion = c.GMSupport.GetVersion() //only gm support VersionGMSSL
-	c.RootCAs = pool
 
 	proxy.Server = &http.Server{
 		Addr:    opts.Addr,
@@ -61,16 +44,6 @@ func NewProxy(opts *Options) (*Proxy, error) {
 				KeepAlive: 30 * time.Second,
 				DualStack: true,
 			}).DialContext,
-			DialTLSContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-				fmt.Println("before gmtls dial ........")
-				var dial, err = tls.Dial(network, address, c)
-				fmt.Println("gmtls dial ........")
-				if err != nil {
-					fmt.Println("whiskerman  gm---err")
-					fmt.Println(err.Error())
-				}
-				return dial, err
-			},
 			MaxIdleConns:          100,
 			IdleConnTimeout:       90 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,

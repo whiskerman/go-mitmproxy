@@ -14,11 +14,12 @@
     - 生成不同域名证书时使用 LRU 缓存，避免重复计算
 - 通过环境变量 `SSLKEYLOGFILE` 支持 `Wireshark` 解析分析流量
 - 上传/下载大文件时支持流式传输
+- WEB 界面：http://localhost:9081
 
 ## 安装
 
 ```
-go get github.com/whiskerman/go-mitmproxy/cmd/mitmproxy
+GO111MODULE=on go get -u github.com/whiskerman/go-mitmproxy/cmd/mitmproxy
 ```
 
 ## 命令行使用
@@ -33,6 +34,8 @@ Usage of mitmproxy:
     	dump filename
   -dump_level int
     	dump level: 0 - header, 1 - header + body
+  -web_addr string
+    	web interface listen addr (default ":9081")
 ```
 
 ## 作为包引入
@@ -53,11 +56,10 @@ Usage of mitmproxy:
 - [x] 命令行参数控制 dump 至文件
 - [x] dump level
 - [x] 文档
-- [ ] support get method with body
+- [x] web 界面
+- [x] Content-Encoding 相关
 - [ ] http2
 - [ ] websocket 解析
-- [ ] web 界面
-- [ ] Content-Encoding 相关
 
 ## License
 

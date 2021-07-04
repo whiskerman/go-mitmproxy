@@ -5,9 +5,6 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-
-	//"crypto/tls"
-
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
@@ -15,8 +12,10 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/golang/groupcache/lru"
@@ -39,6 +38,8 @@ type CA struct {
 
 	cache *lru.Cache
 	group *singleflight.Group
+
+	cacheMu sync.Mutex
 }
 
 func NewCA(path string) (*CA, error) {
@@ -248,15 +249,20 @@ func (ca *CA) saveCert() error {
 }
 
 func (ca *CA) GetCert(commonName string) (*tls.Certificate, error) {
+	ca.cacheMu.Lock()
 	if val, ok := ca.cache.Get(commonName); ok {
+		ca.cacheMu.Unlock()
 		log.WithField("commonName", commonName).Debug("GetCert")
 		return val.(*tls.Certificate), nil
 	}
+	ca.cacheMu.Unlock()
 
 	val, err := ca.group.Do(commonName, func() (interface{}, error) {
 		cert, err := ca.DummyCert(commonName)
 		if err == nil {
+			ca.cacheMu.Lock()
 			ca.cache.Add(commonName, cert)
+			ca.cacheMu.Unlock()
 		}
 		return cert, err
 	})
@@ -281,7 +287,13 @@ func (ca *CA) DummyCert(commonName string) (*tls.Certificate, error) {
 		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
 		SignatureAlgorithm: x509.SHA256WithRSA,
 		ExtKeyUsage:        []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-		DNSNames:           []string{commonName},
+	}
+
+	ip := net.ParseIP(commonName)
+	if ip != nil {
+		template.IPAddresses = []net.IP{ip}
+	} else {
+		template.DNSNames = []string{commonName}
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, template, &ca.RootCert, &ca.PrivateKey.PublicKey, &ca.PrivateKey)
