@@ -3843,9 +3843,9 @@ func http2ConfigureServer(s *Server, conf *http2Server) error {
 	}
 
 	if s.TLSNextProto == nil {
-		s.TLSNextProto = map[string]func(*Server, *tls.Conn, Handler){}
+		s.TLSNextProto = map[string]func(*Server, *tls.Conn, http.Handler){}
 	}
-	protoHandler := func(hs *Server, c *tls.Conn, h Handler) {
+	protoHandler := func(hs *Server, c *tls.Conn, h http.Handler) {
 		if http2testHookOnConn != nil {
 			http2testHookOnConn()
 		}
@@ -3884,7 +3884,7 @@ type http2ServeConnOpts struct {
 	// Handler specifies which handler to use for processing
 	// requests. If nil, BaseConfig.Handler is used. If BaseConfig
 	// or BaseConfig.Handler is nil, http.DefaultServeMux is used.
-	Handler Handler
+	Handler http.Handler
 }
 
 func (o *http2ServeConnOpts) context() context.Context {
@@ -3901,7 +3901,7 @@ func (o *http2ServeConnOpts) baseConfig() *Server {
 	return new(Server)
 }
 
-func (o *http2ServeConnOpts) handler() Handler {
+func (o *http2ServeConnOpts) handler() http.Handler {
 	if o != nil {
 		if o.Handler != nil {
 			return o.Handler
@@ -3910,7 +3910,7 @@ func (o *http2ServeConnOpts) handler() Handler {
 			return o.BaseConfig.Handler
 		}
 	}
-	return DefaultServeMux
+	return http.DefaultServeMux
 }
 
 // ServeConn serves HTTP/2 requests on the provided connection and
@@ -4061,7 +4061,7 @@ type http2serverConn struct {
 	hs               *Server
 	conn             net.Conn
 	bw               *http2bufferedWriter // writing to conn
-	handler          Handler
+	handler          http.Handler
 	baseCtx          context.Context
 	framer           *http2Framer
 	doneServing      chan struct{}               // closed when serverConn.serve ends
@@ -5699,7 +5699,7 @@ func (sc *http2serverConn) newWriterAndRequestNoBody(st *http2stream, rp http2re
 }
 
 // Run on its own goroutine.
-func (sc *http2serverConn) runHandler(rw *http2responseWriter, req *http.Request, handler func(ResponseWriter, *http.Request)) {
+func (sc *http2serverConn) runHandler(rw *http2responseWriter, req *http.Request, handler func(http.ResponseWriter, *http.Request)) {
 	didPanic := true
 	defer func() {
 		rw.rws.stream.cancelCtx()
@@ -5724,7 +5724,7 @@ func (sc *http2serverConn) runHandler(rw *http2responseWriter, req *http.Request
 	didPanic = false
 }
 
-func http2handleHeaderListTooLong(w ResponseWriter, r *http.Request) {
+func http2handleHeaderListTooLong(w http.ResponseWriter, r *http.Request) {
 	// 10.5.1 Limits on Header Block Size:
 	// .. "A server that receives a larger header block than it is
 	// willing to handle can send an HTTP 431 (Request Header Fields Too

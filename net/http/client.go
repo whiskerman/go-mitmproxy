@@ -205,17 +205,17 @@ func send(ireq *http.Request, rt RoundTripper, deadline time.Time) (resp *http.R
 	req := ireq // req is either the original request, or a modified fork
 
 	if rt == nil {
-		req.closeBody()
+		closeBody(req)
 		return nil, alwaysFalse, errors.New("http: no Client.Transport or DefaultTransport")
 	}
 
 	if req.URL == nil {
-		req.closeBody()
+		closeBody(req)
 		return nil, alwaysFalse, errors.New("http: nil Request.URL")
 	}
 
 	if req.RequestURI != "" {
-		req.closeBody()
+		closeBody(req)
 		return nil, alwaysFalse, errors.New("http: Request.RequestURI can't be set in client requests")
 	}
 

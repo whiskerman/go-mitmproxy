@@ -9,7 +9,7 @@ import (
 	"net"
 
 	http "net/http"
-
+    xhttp "github.com/whiskerman/go-mitmproxy/net/http"
 	"github.com/whiskerman/go-mitmproxy/fosafercert"
 
 	x509 "github.com/whiskerman/gmsm/x509"
@@ -37,7 +37,7 @@ type Proxy struct {
 func NewProxy(opts *Options) (*Proxy, error) {
 	proxy := new(Proxy)
 
-	proxy.Server = &http.Server{
+	proxy.Server = &xhttp.Server{
 		Addr:    opts.Addr,
 		Handler: proxy,
 	}
@@ -52,8 +52,8 @@ func NewProxy(opts *Options) (*Proxy, error) {
 		log.Fatal(err)
 	}
 	certPool.AppendCertsFromPEM(cacert)
-	proxy.Client = &http.Client{
-		Transport: &http.Transport{
+	proxy.Client = &xhttp.Client{
+		Transport: &xhttp.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
