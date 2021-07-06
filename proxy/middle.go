@@ -97,6 +97,7 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		support := &tls.GMSupport{WorkMode: tls.ModeAutoSwitch} //NewGMSupport()
 		support.EnableMixMode()
 	*/
+	log.Println("before create server....")
 	server := &http.Server{
 		Handler: m,
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
@@ -110,6 +111,7 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 
 	m.Server = server
 	m.Listener = &listener{make(chan net.Conn)}
+	log.Println("after m.Listener server....")
 
 	return m, nil
 }

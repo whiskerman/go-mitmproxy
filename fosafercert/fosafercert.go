@@ -81,7 +81,7 @@ func NewCA(path string) (*CA, error) {
 			return nil, err
 		}
 	} else {
-		log.Debug("load root ca")
+		log.Printf("load root ca")
 		return ca, nil
 	}
 
@@ -276,7 +276,9 @@ func (ca *CA) load() error {
 	}
 	log.Println("before load SM2Enc")
 	err = ca.loadSM2Enc()
+	log.Println("after load SM2Enc")
 	if err != nil {
+		log.Println("after load SM2Enc")
 		return err
 	}
 	return nil
@@ -409,14 +411,16 @@ func (ca *CA) loadSM2Sign() error {
 func (ca *CA) loadSM2Enc() error {
 
 	smcaFile := ca.caSM2EncKeyFile()
+	log.Println("--1.sm cakey")
 	smstat, err := os.Stat(smcaFile)
 	if err != nil {
+		log.Println("--1. err sm cakey")
 		if os.IsNotExist(err) {
 			return sm2caErrNotFound
 		}
 		return err
 	}
-
+	log.Println("--2.  sm cakey")
 	if !smstat.Mode().IsRegular() {
 		return fmt.Errorf("%v 不是文件", smcaFile)
 	}
@@ -425,17 +429,18 @@ func (ca *CA) loadSM2Enc() error {
 	if err != nil {
 		return err
 	}
-
+	log.Println("--3.  sm cakey")
 	smkeyDERBlock, _ := pem.Decode(smdata)
 	if smkeyDERBlock == nil {
 		return fmt.Errorf("%v 中不存在 PRIVATE KEY", smcaFile)
 	}
 	key, err := x509.ParsePKCS8PrivateKey(smkeyDERBlock.Bytes, nil)
+	log.Println("--4.  sm cakey")
 	if err != nil {
 		return err
 	}
 	ca.RootSM2EncKey = *key
-
+	log.Println("--5.  sm ca enc cert")
 	smcertFile := ca.caSM2EncCertFile()
 	smcertstat, err := os.Stat(smcertFile)
 	if err != nil {
@@ -453,7 +458,7 @@ func (ca *CA) loadSM2Enc() error {
 	if err != nil {
 		return err
 	}
-
+	log.Println("--6.  sm ca enc cert")
 	smcertDERBlock, _ := pem.Decode(smcertdata)
 	if smcertDERBlock == nil {
 		return fmt.Errorf("%v 中不存在 CERTIFICATE", smcertFile)
@@ -464,7 +469,7 @@ func (ca *CA) loadSM2Enc() error {
 		return err
 	}
 	ca.RootSM2EncCert = *smx509Cert
-
+	log.Println("--7.  sm ca enc cert")
 	return nil
 }
 

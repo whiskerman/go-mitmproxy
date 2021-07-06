@@ -48,6 +48,7 @@ func NewProxy(opts *Options) (*Proxy, error) {
 	log.Println("capempath:%s", capempath)
 	cacert, err := ioutil.ReadFile(capempath)
 	if err != nil {
+		log.Println("======err\n")
 		log.Fatal(err)
 	}
 	certPool.AppendCertsFromPEM(cacert)
@@ -86,7 +87,7 @@ func NewProxy(opts *Options) (*Proxy, error) {
 		return nil, err
 	}
 	proxy.Interceptor = interceptor
-
+	log.Println("=====....")
 	if opts.StreamLargeBodies > 0 {
 		proxy.StreamLargeBodies = opts.StreamLargeBodies
 	} else {
