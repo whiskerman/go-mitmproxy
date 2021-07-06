@@ -356,14 +356,18 @@ func setRequestCancel(req *http.Request, rt RoundTripper, deadline time.Time) (s
 		}
 
 		var cancelCtx func()
-		req.ctx, cancelCtx = context.WithDeadline(oldCtx, deadline)
+		var ctxt context.Context
+		ctxt, cancelCtx = context.WithDeadline(oldCtx, deadline)
+		req = req.WithContext(ctxt)
 		return cancelCtx, func() bool { return time.Now().After(deadline) }
 	}
 	initialReqCancel := req.Cancel // the user's original Request.Cancel, if any
 
 	var cancelCtx func()
 	if oldCtx := req.Context(); timeBeforeContextDeadline(deadline, oldCtx) {
-		req.ctx, cancelCtx = context.WithDeadline(oldCtx, deadline)
+		var ctxt context.Context
+		ctxt, cancelCtx = context.WithDeadline(oldCtx, deadline)
+		req = req.WithContext(ctxt)
 	}
 
 	cancel := make(chan struct{})
@@ -525,7 +529,7 @@ func redirectBehavior(reqMethod string, resp *http.Response, ireq *http.Request)
 			shouldRedirect = false
 			break
 		}
-		if ireq.GetBody == nil && ireq.outgoingLength() != 0 {
+		if ireq.GetBody == nil && outgoingLength(ireq) != 0 {
 			// We had a request body, and 307/308 require
 			// re-sending it, but GetBody is not defined. So just
 			// return this response to the user instead of an
@@ -593,7 +597,7 @@ func (c *Client) do(req *http.Request) (retres *http.Response, reterr error) {
 		defer func() { testHookClientDoResult(retres, reterr) }()
 	}
 	if req.URL == nil {
-		req.closeBody()
+		closeBody(req)
 		return nil, &url.Error{
 			Op:  urlErrorOp(req.Method),
 			Err: errors.New("http: nil Request.URL"),
@@ -614,7 +618,7 @@ func (c *Client) do(req *http.Request) (retres *http.Response, reterr error) {
 	uerr := func(err error) error {
 		// the body may have been closed already by c.send()
 		if !reqBodyClosed {
-			req.closeBody()
+			closeBody(req)
 		}
 		var urlStr string
 		if resp != nil && resp.Request != nil {
@@ -659,8 +663,9 @@ func (c *Client) do(req *http.Request) (retres *http.Response, reterr error) {
 				Header:   make(http.Header),
 				Host:     host,
 				Cancel:   ireq.Cancel,
-				ctx:      ireq.ctx,
+				//ctx:      ireq.ctx,
 			}
+			req = req.WithContext(ireq.Context())
 			if includeBody && ireq.GetBody != nil {
 				req.Body, err = ireq.GetBody()
 				if err != nil {
@@ -734,7 +739,7 @@ func (c *Client) do(req *http.Request) (retres *http.Response, reterr error) {
 			return resp, nil
 		}
 
-		req.closeBody()
+		closeBody(req)
 	}
 }
 

@@ -5,8 +5,9 @@ import (
 	"net"
 	"strings"
 
-	xhttp "github.com/whiskerman/go-mitmproxy/net/http"
 	"net/http"
+
+	xhttp "github.com/whiskerman/go-mitmproxy/net/http"
 
 	"github.com/whiskerman/go-mitmproxy/fosafercert"
 )
@@ -57,7 +58,7 @@ type Middle struct {
 	Proxy    *Proxy
 	CA       *fosafercert.CA
 	Listener net.Listener
-	Server   *http.Server
+	Server   *xhttp.Server
 }
 
 func NewMiddle(proxy *Proxy) (Interceptor, error) {

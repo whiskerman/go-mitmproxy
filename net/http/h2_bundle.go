@@ -5900,9 +5900,9 @@ type http2responseWriter struct {
 
 // Optional http.ResponseWriter interfaces implemented.
 var (
-	_ CloseNotifier     = (*http2responseWriter)(nil)
-	_ Flusher           = (*http2responseWriter)(nil)
-	_ http2stringWriter = (*http2responseWriter)(nil)
+	_ http.CloseNotifier = (*http2responseWriter)(nil)
+	_ http.Flusher       = (*http2responseWriter)(nil)
+	_ http2stringWriter  = (*http2responseWriter)(nil)
 )
 
 type http2responseWriterState struct {
@@ -6518,9 +6518,9 @@ func http2checkValidHTTP2RequestHeaders(h http.Header) error {
 	return nil
 }
 
-func http2new400Handler(err error) HandlerFunc {
-	return func(w ResponseWriter, r *http.Request) {
-		Error(w, err.Error(), http.StatusBadRequest)
+func http2new400Handler(err error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 }
 
