@@ -3,8 +3,7 @@ package fosafercert
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
-	stls "crypto/tls"
+
 	sx509 "crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -13,15 +12,17 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
-	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"net"
+
 	"github.com/golang/groupcache/lru"
 	"github.com/golang/groupcache/singleflight"
 	_log "github.com/sirupsen/logrus"
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"github.com/whiskerman/gmsm/sm2"
 	x509 "github.com/whiskerman/gmsm/x509"
 )
@@ -38,7 +39,7 @@ var sm2caErrNotFound = errors.New("fosaferSm2Ca not found")
 type CA struct {
 	sm2PrivateKey   sm2.PrivateKey
 	rsaPrivateKey   rsa.PrivateKey
-	RootRSACert     sx509.Certificate
+	RootRSACert     x509.Certificate
 	RootSM2Cert     x509.Certificate
 	RootSM2SignCert x509.Certificate
 	RootSM2EncCert  x509.Certificate
@@ -75,6 +76,7 @@ func NewCA(path string) (*CA, error) {
 	}
 
 	if err := ca.load(); err != nil {
+		log.Printf("ca load ...: %v", err)
 		if err != rsacaErrNotFound {
 			return nil, err
 		}
@@ -90,7 +92,14 @@ func NewCA(path string) (*CA, error) {
 
 	return ca, nil
 }
-
+func GetSM2CAPem() string {
+	path, err := getStorePath("")
+	if err != nil {
+		log.Printf("sm2 ca pem not exist")
+		return ""
+	}
+	return filepath.Join(path, "cacertnginx.pem")
+}
 func getStorePath(path string) (string, error) {
 	if path == "" {
 		execpath, err := os.Executable()
@@ -183,7 +192,25 @@ func (ca *CA) caSM2CertFile() string {
 	return filepath.Join(ca.StorePath, "cacert.pem")
 }
 
-func (ca *CA) load() error {
+func (ca *CA) caSM2EncKeyFile() string {
+	return filepath.Join(ca.StorePath, "enccert.key.pem")
+}
+
+// The certificate in PEM format.
+func (ca *CA) caSM2SignCertFile() string {
+	return filepath.Join(ca.StorePath, "signcert.pem")
+}
+
+func (ca *CA) caSM2SignKeyFile() string {
+	return filepath.Join(ca.StorePath, "signcert.key.pem")
+}
+
+// The certificate in PEM format.
+func (ca *CA) caSM2EncCertFile() string {
+	return filepath.Join(ca.StorePath, "enccert.pem")
+}
+
+func (ca *CA) loadRSA() error {
 	caFile := ca.caRSAKeyFile()
 	stat, err := os.Stat(caFile)
 	if err != nil {
@@ -221,11 +248,41 @@ func (ca *CA) load() error {
 		return errors.New("found unknown rsa private key type in PKCS#8 wrapping")
 	}
 
-	x509Cert, err := sx509.ParseCertificate(certDERBlock.Bytes)
+	x509Cert, err := x509.ParseCertificate(certDERBlock.Bytes)
 	if err != nil {
 		return err
 	}
 	ca.RootRSACert = *x509Cert
+	return nil
+
+}
+
+func (ca *CA) load() error {
+	log.Println("before load RSA")
+	err := ca.loadRSA()
+	if err != nil {
+		return err
+	}
+	log.Println("before load SM2")
+	/*err = ca.loadSM2()
+	if err != nil {
+		return err
+	}
+	*/
+	log.Println("before load SM2Sign")
+	err = ca.loadSM2Sign()
+	if err != nil {
+		return err
+	}
+	log.Println("before load SM2Enc")
+	err = ca.loadSM2Enc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ca *CA) loadSM2() error {
 
 	smcaFile := ca.caSM2KeyFile()
 	smstat, err := os.Stat(smcaFile)
@@ -249,6 +306,12 @@ func (ca *CA) load() error {
 	if smkeyDERBlock == nil {
 		return fmt.Errorf("%v 中不存在 PRIVATE KEY", smcaFile)
 	}
+
+	key, err := x509.ParsePKCS8PrivateKey(smkeyDERBlock.Bytes, nil)
+	if err != nil {
+		return err
+	}
+	ca.sm2PrivateKey = *key
 	smcertFile := ca.caSM2CertFile()
 	smcertstat, err := os.Stat(smcertFile)
 	if err != nil {
@@ -277,6 +340,130 @@ func (ca *CA) load() error {
 		return err
 	}
 	ca.RootSM2Cert = *smx509Cert
+
+	return nil
+}
+
+func (ca *CA) loadSM2Sign() error {
+
+	smcaFile := ca.caSM2SignKeyFile()
+	smstat, err := os.Stat(smcaFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return sm2caErrNotFound
+		}
+		return err
+	}
+
+	if !smstat.Mode().IsRegular() {
+		return fmt.Errorf("%v 不是文件", smcaFile)
+	}
+
+	smdata, err := ioutil.ReadFile(smcaFile)
+	if err != nil {
+		return err
+	}
+
+	smkeyDERBlock, _ := pem.Decode(smdata)
+	if smkeyDERBlock == nil {
+		return fmt.Errorf("%v 中不存在 PRIVATE KEY", smcaFile)
+	}
+	key, err := x509.ParsePKCS8PrivateKey(smkeyDERBlock.Bytes, nil)
+	if err != nil {
+		return err
+	}
+	ca.RootSM2SignKey = *key
+
+	smcertFile := ca.caSM2SignCertFile()
+	smcertstat, err := os.Stat(smcertFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return sm2caErrNotFound
+		}
+		return err
+	}
+
+	if !smcertstat.Mode().IsRegular() {
+		return fmt.Errorf("%v 不是文件", smcertFile)
+	}
+
+	smcertdata, err := ioutil.ReadFile(smcertFile)
+	if err != nil {
+		return err
+	}
+
+	smcertDERBlock, _ := pem.Decode(smcertdata)
+	if smcertDERBlock == nil {
+		return fmt.Errorf("%v 中不存在 CERTIFICATE", smcertFile)
+	}
+
+	smx509Cert, err := x509.ParseCertificate(smcertDERBlock.Bytes)
+	if err != nil {
+		return err
+	}
+	ca.RootSM2SignCert = *smx509Cert
+
+	return nil
+}
+
+func (ca *CA) loadSM2Enc() error {
+
+	smcaFile := ca.caSM2EncKeyFile()
+	smstat, err := os.Stat(smcaFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return sm2caErrNotFound
+		}
+		return err
+	}
+
+	if !smstat.Mode().IsRegular() {
+		return fmt.Errorf("%v 不是文件", smcaFile)
+	}
+
+	smdata, err := ioutil.ReadFile(smcaFile)
+	if err != nil {
+		return err
+	}
+
+	smkeyDERBlock, _ := pem.Decode(smdata)
+	if smkeyDERBlock == nil {
+		return fmt.Errorf("%v 中不存在 PRIVATE KEY", smcaFile)
+	}
+	key, err := x509.ParsePKCS8PrivateKey(smkeyDERBlock.Bytes, nil)
+	if err != nil {
+		return err
+	}
+	ca.RootSM2EncKey = *key
+
+	smcertFile := ca.caSM2EncCertFile()
+	smcertstat, err := os.Stat(smcertFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return sm2caErrNotFound
+		}
+		return err
+	}
+
+	if !smcertstat.Mode().IsRegular() {
+		return fmt.Errorf("%v 不是文件", smcertFile)
+	}
+
+	smcertdata, err := ioutil.ReadFile(smcertFile)
+	if err != nil {
+		return err
+	}
+
+	smcertDERBlock, _ := pem.Decode(smcertdata)
+	if smcertDERBlock == nil {
+		return fmt.Errorf("%v 中不存在 CERTIFICATE", smcertFile)
+	}
+
+	smx509Cert, err := x509.ParseCertificate(smcertDERBlock.Bytes)
+	if err != nil {
+		return err
+	}
+	ca.RootSM2EncCert = *smx509Cert
 
 	return nil
 }
@@ -316,7 +503,7 @@ func (ca *CA) create() error {
 	if err != nil {
 		return err
 	}
-	cert, err := sx509.ParseCertificate(certBytes)
+	cert, err := x509.ParseCertificate(certBytes)
 	if err != nil {
 		return err
 	}
@@ -365,12 +552,12 @@ func (ca *CA) saveRSACert() error {
 	return ca.saveRSACertTo(file)
 }
 
-func (ca *CA) GetRSACert(commonName string) (*stls.Certificate, error) {
+func (ca *CA) GetRSACert(commonName string) (*tls.Certificate, error) {
 	ca.cacheMu.Lock()
 	if val, ok := ca.cache.Get(commonName); ok {
 		ca.cacheMu.Unlock()
 		log.WithField("commonName", commonName).Debug("GetRSACert")
-		return val.(*stls.Certificate), nil
+		return val.(*tls.Certificate), nil
 	}
 	ca.cacheMu.Unlock()
 
@@ -388,11 +575,11 @@ func (ca *CA) GetRSACert(commonName string) (*stls.Certificate, error) {
 		return nil, err
 	}
 
-	return val.(*stls.Certificate), nil
+	return val.(*tls.Certificate), nil
 }
 
 // TODO: 是否应该支持多个 SubjectAltName
-func (ca *CA) DummyRSACert(commonName string) (*stls.Certificate, error) {
+func (ca *CA) DummyRSACert(commonName string) (*tls.Certificate, error) {
 	log.WithField("commonName", commonName).Debug("DummyCert")
 	template := &sx509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
@@ -413,12 +600,12 @@ func (ca *CA) DummyRSACert(commonName string) (*stls.Certificate, error) {
 		template.DNSNames = []string{commonName}
 	}
 
-	certBytes, err := sx509.CreateCertificate(rand.Reader, template, &ca.RootRSACert, &ca.rsaPrivateKey.PublicKey, &ca.rsaPrivateKey)
+	certBytes, err := sx509.CreateCertificate(rand.Reader, template, template, &ca.rsaPrivateKey.PublicKey, &ca.rsaPrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cert := &stls.Certificate{
+	cert := &tls.Certificate{
 		Certificate: [][]byte{certBytes},
 		PrivateKey:  &ca.rsaPrivateKey,
 	}
@@ -438,9 +625,9 @@ func (ca *CA) GetSM2SignCert(commonName string) (*tls.Certificate, error) {
 	val, err := ca.smsigngroup.Do(commonName, func() (interface{}, error) {
 		cert, err := ca.DummySM2SignCert(commonName)
 		if err == nil {
-			ca.cacheMu.Lock()
-			ca.cache.Add(commonName, cert)
-			ca.cacheMu.Unlock()
+			ca.smsigncacheMu.Lock()
+			ca.smsigncache.Add(commonName, cert)
+			ca.smsigncacheMu.Unlock()
 		}
 		return cert, err
 	})
@@ -449,7 +636,33 @@ func (ca *CA) GetSM2SignCert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	return val.(*stls.Certificate), nil
+	return val.(*tls.Certificate), nil
+}
+
+func (ca *CA) GetSM2EncCert(commonName string) (*tls.Certificate, error) {
+	ca.smenccacheMu.Lock()
+	if val, ok := ca.smenccache.Get(commonName); ok {
+		ca.smenccacheMu.Unlock()
+		log.WithField("commonName", commonName).Debug("GetSM2SignCert")
+		return val.(*tls.Certificate), nil
+	}
+	ca.smenccacheMu.Unlock()
+
+	val, err := ca.smencgroup.Do(commonName, func() (interface{}, error) {
+		cert, err := ca.DummySM2EncCert(commonName)
+		if err == nil {
+			ca.smenccacheMu.Lock()
+			ca.smenccache.Add(commonName, cert)
+			ca.smenccacheMu.Unlock()
+		}
+		return cert, err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return val.(*tls.Certificate), nil
 }
 
 // TODO: 是否应该支持多个 SubjectAltName
@@ -459,11 +672,12 @@ func (ca *CA) DummySM2SignCert(commonName string) (*tls.Certificate, error) {
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
 		Subject: pkix.Name{
 			CommonName:   commonName,
-			Organization: []string{"mitmproxy"},
+			Organization: []string{"FOSAFER"},
 		},
 		NotBefore:          time.Now().Add(-time.Hour * 48),
 		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
-		SignatureAlgorithm: x509.SHA256WithRSA,
+		SignatureAlgorithm: x509.SM2WithSM3,
+		KeyUsage:           x509.KeyUsageCertSign,
 		ExtKeyUsage:        []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 
@@ -474,14 +688,48 @@ func (ca *CA) DummySM2SignCert(commonName string) (*tls.Certificate, error) {
 		template.DNSNames = []string{commonName}
 	}
 
-	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2Cert, &ca.sm2PrivateKey.PublicKey, &ca.sm2PrivateKey)
+	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2SignCert, &ca.RootSM2SignKey.PublicKey, &ca.RootSM2SignKey)
 	if err != nil {
 		return nil, err
 	}
 
 	cert := &tls.Certificate{
 		Certificate: [][]byte{certBytes},
-		PrivateKey:  &ca.sm2PrivateKey,
+		PrivateKey:  &ca.RootSM2SignKey,
+	}
+
+	return cert, nil
+}
+func (ca *CA) DummySM2EncCert(commonName string) (*tls.Certificate, error) {
+	log.WithField("commonName", commonName).Debug("DummyCert")
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
+		Subject: pkix.Name{
+			CommonName:   commonName,
+			Organization: []string{"FOSAFER"},
+		},
+		NotBefore:          time.Now().Add(-time.Hour * 48),
+		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
+		SignatureAlgorithm: x509.SM2WithSM3,
+		KeyUsage:           x509.KeyUsageEncipherOnly,
+		ExtKeyUsage:        []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	}
+
+	ip := net.ParseIP(commonName)
+	if ip != nil {
+		template.IPAddresses = []net.IP{ip}
+	} else {
+		template.DNSNames = []string{commonName}
+	}
+
+	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2EncCert, &ca.RootSM2EncKey.PublicKey, &ca.RootSM2EncKey)
+	if err != nil {
+		return nil, err
+	}
+
+	cert := &tls.Certificate{
+		Certificate: [][]byte{certBytes},
+		PrivateKey:  &ca.RootSM2EncKey,
 	}
 
 	return cert, nil

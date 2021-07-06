@@ -12,11 +12,12 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
-	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"net"
 
 	"github.com/golang/groupcache/lru"
 	"github.com/golang/groupcache/singleflight"

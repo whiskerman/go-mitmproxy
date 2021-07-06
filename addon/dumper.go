@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"unicode"
+
+	"net/http"
 
 	"github.com/whiskerman/go-mitmproxy/flow"
 )

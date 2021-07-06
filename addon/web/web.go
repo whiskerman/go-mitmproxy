@@ -3,8 +3,9 @@ package web
 import (
 	"embed"
 	"io/fs"
-	"net/http"
 	"sync"
+
+	"net/http"
 
 	"github.com/gorilla/websocket"
 	_log "github.com/sirupsen/logrus"

@@ -3,10 +3,11 @@ package proxy
 import (
 	"bytes"
 	"io"
-	"net"
 	"os"
 	"strings"
 	"sync"
+
+	"net"
 
 	_log "github.com/sirupsen/logrus"
 )

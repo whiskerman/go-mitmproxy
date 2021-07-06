@@ -5,11 +5,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/whiskerman/go-mitmproxy/net/http"
+	"net/http"
 
-	tls "github.com/whiskerman/gmsm/gmtls"
-
-	"github.com/whiskerman/go-mitmproxy/cert"
+	"github.com/whiskerman/go-mitmproxy/fosafercert"
 )
 
 // 模拟了标准库中 server 运行，目的是仅通过当前进程内存转发 socket 数据，不需要经过 tcp 或 unix socket
@@ -56,13 +54,13 @@ func (b *connBuf) Read(data []byte) (int, error) {
 // Middle: man-in-the-middle
 type Middle struct {
 	Proxy    *Proxy
-	CA       *cert.CA
+	CA       *fosafercert.CA
 	Listener net.Listener
 	Server   *http.Server
 }
 
 func NewMiddle(proxy *Proxy) (Interceptor, error) {
-	ca, err := cert.NewCA("")
+	ca, err := fosafercert.NewCA("")
 	if err != nil {
 		return nil, err
 	}
@@ -71,16 +69,43 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		Proxy: proxy,
 		CA:    ca,
 	}
+	/*
+		fncGetSignCertKeypair := func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			gmFlag := false
+			// 检查支持协议中是否包含GMSSL
+			for _, v := range info.SupportedVersions {
+				if v == tls.VersionGMSSL {
+					log.Printf("ssl version:%v", v)
+					gmFlag = true
+					break
+				}
+			}
 
+			if gmFlag {
+				log.Printf("gmssl sign info:%v", info)
+				return ca.GetSM2SignCert(info.ServerName)
+			} else {
+				log.Printf("rsa ssl info:%v", info)
+				return ca.GetRSACert(info.ServerName)
+			}
+		}
+
+		fncGetEncCertKeypair := func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			log.Printf("gm ssl enc info:%v", info)
+			return ca.GetSM2EncCert(info.ServerName)
+		}
+		support := &tls.GMSupport{WorkMode: tls.ModeAutoSwitch} //NewGMSupport()
+		support.EnableMixMode()
+	*/
 	server := &http.Server{
-		Handler:      m,
-		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
-		TLSConfig: &tls.Config{
-			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				log.Debugf("Middle GetCertificate ServerName: %v\n", chi.ServerName)
-				return nil, nil //ca.GetCert(chi.ServerName)
-			},
+		Handler: m,
+		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
+		/*TLSConfig: &tls.Config{
+			GMSupport:        support,
+			GetCertificate:   fncGetSignCertKeypair,
+			GetKECertificate: fncGetEncCertKeypair,
 		},
+		*/
 	}
 
 	m.Server = server
@@ -127,8 +152,11 @@ func (m *Middle) intercept(serverConn *connBuf) {
 		serverConn.Close()
 		return
 	}
-
+	log.Printf("buf[0]:%x buf[1]:%x buf[2]:%x", buf[0], buf[1], buf[2])
 	if buf[0] == 0x16 && buf[1] == 0x03 && (buf[2] >= 0x0 || buf[2] <= 0x03) {
+		// tls
+		m.Listener.(*listener).connChan <- serverConn
+	} else if buf[0] == 0x16 && buf[1] == 0x01 && (buf[2] >= 0x0 || buf[2] <= 0x03) {
 		// tls
 		m.Listener.(*listener).connChan <- serverConn
 	} else {

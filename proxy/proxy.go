@@ -3,12 +3,16 @@ package proxy
 import (
 	"bytes"
 	"io"
-	"net"
+	"io/ioutil"
 	"time"
 
-	http "github.com/whiskerman/go-mitmproxy/net/http"
+	"net"
 
-	tls "github.com/whiskerman/gmsm/gmtls"
+	http "net/http"
+
+	"github.com/whiskerman/go-mitmproxy/fosafercert"
+
+	x509 "github.com/whiskerman/gmsm/x509"
 
 	_log "github.com/sirupsen/logrus"
 	"github.com/whiskerman/go-mitmproxy/addon"
@@ -37,7 +41,16 @@ func NewProxy(opts *Options) (*Proxy, error) {
 		Addr:    opts.Addr,
 		Handler: proxy,
 	}
+	log.Println("created proxy.Server....")
 
+	certPool := x509.NewCertPool()
+	capempath := fosafercert.GetSM2CAPem()
+	log.Println("capempath:%s", capempath)
+	cacert, err := ioutil.ReadFile(capempath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	certPool.AppendCertsFromPEM(cacert)
 	proxy.Client = &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -52,16 +65,22 @@ func NewProxy(opts *Options) (*Proxy, error) {
 			ExpectContinueTimeout: 1 * time.Second,
 			ForceAttemptHTTP2:     false, // disable http2
 			DisableCompression:    true,  // To get the original response from the server, set Transport.DisableCompression to true.
-			TLSClientConfig: &tls.Config{
-				KeyLogWriter: GetTlsKeyLogWriter(),
-			},
+			/*	TLSClientConfig: &tls.Config{
+					GMSupport:          &tls.GMSupport{},
+					RootCAs:            certPool,
+					InsecureSkipVerify: true,
+					KeyLogWriter:       GetTlsKeyLogWriter(),
+					Certificates:       []gmtls.Certificate{}, //[]gmtls.Certificate{}, //
+
+				},
+			*/
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			// 禁止自动重定向
 			return http.ErrUseLastResponse
 		},
 	}
-
+	log.Println("create proxy.Client....")
 	interceptor, err := NewMiddle(proxy)
 	if err != nil {
 		return nil, err

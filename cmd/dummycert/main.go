@@ -8,7 +8,7 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/whiskerman/go-mitmproxy/cert"
+	"github.com/whiskerman/go-mitmproxy/fosafercert"
 )
 
 // 生成假的/用于测试的服务器证书
@@ -37,12 +37,12 @@ func main() {
 		log.Fatal("commonName required")
 	}
 
-	ca, err := cert.NewCA("")
+	ca, err := fosafercert.NewCA("")
 	if err != nil {
 		panic(err)
 	}
 
-	cert, err := ca.DummyCert(config.commonName)
+	cert, err := ca.DummySM2SignCert(config.commonName)
 	if err != nil {
 		panic(err)
 	}
@@ -54,7 +54,7 @@ func main() {
 	}
 	os.Stdout.WriteString(fmt.Sprintf("\n%v-key.pem\n", config.commonName))
 
-	keyBytes, err := x509.MarshalPKCS8PrivateKey(&ca.PrivateKey)
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(&ca.RootSM2SignKey)
 	if err != nil {
 		panic(err)
 	}

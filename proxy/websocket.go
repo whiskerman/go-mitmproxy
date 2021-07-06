@@ -1,13 +1,15 @@
 package proxy
 
 import (
-	"net"
 	"strings"
 
-	"github.com/whiskerman/go-mitmproxy/net/http/httputil"
+	"net"
+
+	"net/http/httputil"
+
+	http "net/http"
 
 	tls "github.com/whiskerman/gmsm/gmtls"
-	http "github.com/whiskerman/go-mitmproxy/net/http"
 )
 
 // 当前仅做了转发 websocket 流量

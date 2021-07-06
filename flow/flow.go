@@ -3,9 +3,10 @@ package flow
 import (
 	"encoding/json"
 	"errors"
+
 	"net/url"
 
-	"github.com/whiskerman/go-mitmproxy/net/http"
+	"net/http"
 
 	uuid "github.com/satori/go.uuid"
 	_log "github.com/sirupsen/logrus"
