@@ -17,7 +17,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	http "net/http"
+	"net/http"
 	"net/textproto"
 	"net/url"
 	urlpkg "net/url"
@@ -1047,6 +1047,17 @@ func appendTime(b []byte, t time.Time) []byte {
 
 var errTooLarge = errors.New("http: request too large")
 
+func isH2Upgrade(r *http.Request) bool {
+	return r.Method == "PRI" && len(r.Header) == 0 && r.URL.Path == "*" && r.Proto == "HTTP/2.0"
+}
+
+func wantsHttp10KeepAlive(r *http.Request) bool {
+	if r.ProtoMajor != 1 || r.ProtoMinor != 0 {
+		return false
+	}
+	return hasToken(getHeader(r.Header, "Connection"), "keep-alive")
+}
+
 // Read next request from connection.
 func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 	if c.hijacked() {
@@ -1077,7 +1088,7 @@ func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 		peek, _ := c.bufr.Peek(4) // ReadRequest will get err below
 		c.bufr.Discard(numLeadingCRorLF(peek))
 	}
-	req, err := readRequest(c.bufr, keepHostHeader)
+	req, err := http.ReadRequest1(c.bufr)
 	if err != nil {
 		if c.r.hitReadLimit() {
 			return nil, errTooLarge
@@ -1093,7 +1104,7 @@ func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 	c.r.setInfiniteReadLimit()
 
 	hosts, haveHost := req.Header["Host"]
-	isH2Upgrade := req.isH2Upgrade()
+	isH2Upgrade := isH2Upgrade(req)
 	if req.ProtoAtLeast(1, 1) && (!haveHost || len(hosts) == 0) && !isH2Upgrade && req.Method != "CONNECT" {
 		return nil, badRequestError("missing required Host header")
 	}
@@ -1116,7 +1127,7 @@ func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 	delete(req.Header, "Host")
 
 	ctx, cancelCtx := context.WithCancel(ctx)
-	req.ctx = ctx
+	req = req.WithContext(ctx)
 	req.RemoteAddr = c.remoteAddr
 	req.TLS = c.tlsState
 	if body, ok := req.Body.(*body); ok {
@@ -1140,8 +1151,8 @@ func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 		// We populate these ahead of time so we're not
 		// reading from req.Header after their Handler starts
 		// and maybe mutates it (Issue 14940)
-		wants10KeepAlive: req.wantsHttp10KeepAlive(),
-		wantsClose:       req.wantsClose(),
+		wants10KeepAlive: wantsHttp10KeepAlive(req),
+		wantsClose:       wantsClose(req),
 	}
 	if isH2Upgrade {
 		w.closeAfterReply = true
@@ -1304,6 +1315,17 @@ func (h extraHeader) Write(w *bufio.Writer) {
 		}
 	}
 }
+func bodyAllowedForStatus(status int) bool {
+	switch {
+	case status >= 100 && status <= 199:
+		return false
+	case status == 204:
+		return false
+	case status == 304:
+		return false
+	}
+	return true
+}
 
 // writeHeader finalizes the header sent to the client and writes it
 // to cw.res.conn.bufw.
@@ -1408,7 +1430,7 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		w.closeAfterReply = true
 	}
 
-	if header.get("Connection") == "close" || !keepAlivesEnabled {
+	if header.Get("Connection") == "close" || !keepAlivesEnabled {
 		w.closeAfterReply = true
 	}
 
@@ -1500,7 +1522,7 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		ce := header.Get("Content-Encoding")
 		hasCE := len(ce) > 0
 		if !hasCE && !haveType && !hasTE && len(p) > 0 {
-			setHeader.contentType = DetectContentType(p)
+			setHeader.contentType = http.DetectContentType(p)
 		}
 	} else {
 		for _, k := range suppressedHeaders(code) {
@@ -1508,7 +1530,7 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		}
 	}
 
-	if !header.has("Date") {
+	if header.Get("Date") != "" {
 		setHeader.date = appendTime(cw.res.dateBuf[:0], time.Now())
 	}
 
@@ -1566,7 +1588,7 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 	// protocol switch response and if KeepAlives are not enabled.
 	// See https://golang.org/issue/36381.
 	delConnectionHeader := w.closeAfterReply &&
-		(!keepAlivesEnabled || !hasToken(cw.header.get("Connection"), "close")) &&
+		(!keepAlivesEnabled || !hasToken(cw.header.Get("Connection"), "close")) &&
 		!isProtocolSwitchResponse(w.status, header)
 	if delConnectionHeader {
 		delHeader("Connection")
@@ -1579,6 +1601,14 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 	cw.header.WriteSubset(w.conn.bufw, excludeHeader)
 	setHeader.Write(w.conn.bufw)
 	w.conn.bufw.Write(crlf)
+}
+
+func isProtocolSwitchResponse(code int, h http.Header) bool {
+	return code == http.StatusSwitchingProtocols && isProtocolSwitchHeader(h)
+}
+func isProtocolSwitchHeader(h http.Header) bool {
+	return h.Get("Upgrade") != "" &&
+		httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade")
 }
 
 // foreachHeaderElement splits v according to the "#rule" construction
@@ -1609,7 +1639,7 @@ func writeStatusLine(bw *bufio.Writer, is11 bool, code int, scratch []byte) {
 	} else {
 		bw.WriteString("HTTP/1.0 ")
 	}
-	if text, ok := http.StatusText(code); ok {
+	if text := http.StatusText(code); text != "" {
 		bw.Write(strconv.AppendInt(scratch[:0], int64(code), 10))
 		bw.WriteByte(' ')
 		bw.WriteString(text)
@@ -2006,7 +2036,7 @@ func (c *conn) serve(ctx context.Context) {
 
 			default:
 				if v, ok := err.(statusError); ok {
-					fmt.Fprintf(c.rwc, "HTTP/1.1 %d %s: %s%s%d %s: %s", v.code, http.StatusText(v.code), v.text, errorHeaders, v.code, StatusText(v.code), v.text)
+					fmt.Fprintf(c.rwc, "HTTP/1.1 %d %s: %s%s%d %s: %s", v.code, http.StatusText(v.code), v.text, errorHeaders, v.code, http.StatusText(v.code), v.text)
 					return
 				}
 				publicErr := "400 Bad Request"
@@ -2017,13 +2047,13 @@ func (c *conn) serve(ctx context.Context) {
 
 		// Expect 100 Continue support
 		req := w.req
-		if req.expectsContinue() {
+		if expectsContinue(req) {
 			if req.ProtoAtLeast(1, 1) && req.ContentLength != 0 {
 				// Wrap the Body reader with one that replies on the connection
 				req.Body = &expectContinueReader{readCloser: req.Body, resp: w}
 				w.canWriteContinue.setTrue()
 			}
-		} else if req.Header.get("Expect") != "" {
+		} else if req.Header.Get("Expect") != "" {
 			w.sendExpectationFailed()
 			return
 		}

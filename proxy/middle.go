@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	xhttp "github.com/whiskerman/go-mitmproxy/net/http"
 	"net/http"
 
 	"github.com/whiskerman/go-mitmproxy/fosafercert"
@@ -98,7 +99,7 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		support.EnableMixMode()
 	*/
 	log.Println("before create server....")
-	server := &http.Server{
+	server := &xhttp.Server{
 		Handler: m,
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
 		/*TLSConfig: &tls.Config{
