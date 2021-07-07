@@ -6,11 +6,14 @@
 
 package websocket
 
-import "crypto/tls"
+import (
+	"github.com/whiskerman/gmsm/gmtls"
+	//"crypto/tls"
+)
 
-func cloneTLSConfig(cfg *tls.Config) *tls.Config {
+func cloneTLSConfig(cfg *gmtls.Config) *gmtls.Config {
 	if cfg == nil {
-		return &tls.Config{}
+		return &gmtls.Config{}
 	}
 	return cfg.Clone()
 }

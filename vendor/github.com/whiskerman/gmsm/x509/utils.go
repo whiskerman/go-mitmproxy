@@ -7,9 +7,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"log"
 	"math/big"
 
 	"github.com/whiskerman/gmsm/sm2"
@@ -21,6 +23,184 @@ func ReadPrivateKeyFromPem(privateKeyPem []byte, pwd []byte) (*sm2.PrivateKey, e
 	if block == nil {
 		return nil, errors.New("failed to decode private key")
 	}
+	priv, err := ParsePKCS8PrivateKey(block.Bytes, pwd)
+	return priv, err
+}
+func getLine(data []byte) (line, rest []byte) {
+	i := bytes.IndexByte(data, '\n')
+	var j int
+	if i < 0 {
+		i = len(data)
+		j = i
+	} else {
+		j = i + 1
+		if i > 0 && data[i-1] == '\r' {
+			i--
+		}
+	}
+	return bytes.TrimRight(data[0:i], " \t"), data[j:]
+}
+
+var pemStart = []byte("\n-----BEGIN EC PRIVATE KEY-----")
+var pemEnd = []byte("\n-----END EC PRIVATE KEY-----")
+var pemEndOfLine = []byte("-----")
+
+func decodeError(data, rest []byte) (*pem.Block, []byte) {
+	// If we get here then we have rejected a likely looking, but
+	// ultimately invalid PEM block. We need to start over from a new
+	// position. We have consumed the preamble line and will have consumed
+	// any lines which could be header lines. However, a valid preamble
+	// line is not a valid header line, therefore we cannot have consumed
+	// the preamble line for the any subsequent block. Thus, we will always
+	// find any valid block, no matter what bytes precede it.
+	//
+	// For example, if the input is
+	//
+	//    -----BEGIN MALFORMED BLOCK-----
+	//    junk that may look like header lines
+	//   or data lines, but no END line
+	//
+	//    -----BEGIN ACTUAL BLOCK-----
+	//    realdata
+	//    -----END ACTUAL BLOCK-----
+	//
+	// we've failed to parse using the first BEGIN line
+	// and now will try again, using the second BEGIN line.
+	p, rest := Decode(rest)
+	if p == nil {
+		rest = data
+	}
+	return p, rest
+}
+
+func removeSpacesAndTabs(data []byte) []byte {
+	if !bytes.ContainsAny(data, " \t") {
+		// Fast path; most base64 data within PEM contains newlines, but
+		// no spaces nor tabs. Skip the extra alloc and work.
+		return data
+	}
+	result := make([]byte, len(data))
+	n := 0
+
+	for _, b := range data {
+		if b == ' ' || b == '\t' {
+			continue
+		}
+		result[n] = b
+		n++
+	}
+
+	return result[0:n]
+}
+
+func Decode(data []byte) (p *pem.Block, rest []byte) {
+	// pemStart begins with a newline. However, at the very beginning of
+	// the byte array, we'll accept the start string without it.
+	rest = data
+	if bytes.HasPrefix(data, pemStart[1:]) {
+		rest = rest[len(pemStart)-1 : len(data)]
+	} else if i := bytes.Index(data, pemStart); i >= 0 {
+		rest = rest[i+len(pemStart) : len(data)]
+	} else {
+		return nil, data
+	}
+
+	typeLine, rest := getLine(rest)
+	if !bytes.HasSuffix(typeLine, pemEndOfLine) {
+		return decodeError(data, rest)
+	}
+	typeLine = typeLine[0 : len(typeLine)-len(pemEndOfLine)]
+
+	p = &pem.Block{
+		Headers: make(map[string]string),
+		Type:    string(typeLine),
+	}
+
+	for {
+		// This loop terminates because getLine's second result is
+		// always smaller than its argument.
+		if len(rest) == 0 {
+			return nil, data
+		}
+		line, next := getLine(rest)
+
+		i := bytes.IndexByte(line, ':')
+		if i == -1 {
+			break
+		}
+
+		// TODO(agl): need to cope with values that spread across lines.
+		key, val := line[:i], line[i+1:]
+		key = bytes.TrimSpace(key)
+		val = bytes.TrimSpace(val)
+		p.Headers[string(key)] = string(val)
+		rest = next
+	}
+
+	var endIndex, endTrailerIndex int
+
+	// If there were no headers, the END line might occur
+	// immediately, without a leading newline.
+	if len(p.Headers) == 0 && bytes.HasPrefix(rest, pemEnd[1:]) {
+		endIndex = 0
+		endTrailerIndex = len(pemEnd) - 1
+	} else {
+		endIndex = bytes.Index(rest, pemEnd)
+		endTrailerIndex = endIndex + len(pemEnd)
+	}
+
+	if endIndex < 0 {
+		return decodeError(data, rest)
+	}
+
+	// After the "-----" of the ending line, there should be the same type
+	// and then a final five dashes.
+	endTrailer := rest[endTrailerIndex:]
+	endTrailerLen := len(typeLine) + len(pemEndOfLine)
+	if len(endTrailer) < endTrailerLen {
+		return decodeError(data, rest)
+	}
+
+	restOfEndLine := endTrailer[endTrailerLen:]
+	endTrailer = endTrailer[:endTrailerLen]
+	if !bytes.HasPrefix(endTrailer, typeLine) ||
+		!bytes.HasSuffix(endTrailer, pemEndOfLine) {
+		return decodeError(data, rest)
+	}
+
+	// The line must end with only whitespace.
+	if s, _ := getLine(restOfEndLine); len(s) != 0 {
+		return decodeError(data, rest)
+	}
+
+	base64Data := removeSpacesAndTabs(rest[:endIndex])
+	p.Bytes = make([]byte, base64.StdEncoding.DecodedLen(len(base64Data)))
+	n, err := base64.StdEncoding.Decode(p.Bytes, base64Data)
+	if err != nil {
+		return decodeError(data, rest)
+	}
+	p.Bytes = p.Bytes[:n]
+
+	// the -1 is because we might have only matched pemEnd without the
+	// leading newline if the PEM block was empty.
+	_, rest = getLine(rest[endIndex+len(pemEnd)-1:])
+
+	return
+}
+
+func ReadSM2PrivateKeyFromPem(privateKeyPem []byte, pwd []byte) (*sm2.PrivateKey, error) {
+	var block *pem.Block
+	var rest []byte
+	block, rest = pem.Decode(privateKeyPem)
+	log.Printf("block:%s", block)
+	if len(rest) > 0 {
+		block, _ = pem.Decode(rest)
+		log.Printf("second block:%s", block)
+	}
+	if block == nil {
+		return nil, errors.New("failed to decode private key")
+	}
+	log.Printf("private block :%v", block)
 	priv, err := ParsePKCS8PrivateKey(block.Bytes, pwd)
 	return priv, err
 }
@@ -44,6 +224,35 @@ func WritePrivateKeyToPem(key *sm2.PrivateKey, pwd []byte) ([]byte, error) {
 	}
 	certPem := pem.EncodeToMemory(block)
 	return certPem, nil
+}
+
+func WriteSM2PrivateKeyToPem(key *sm2.PrivateKey, pwd []byte) ([]byte, error) {
+	var block *pem.Block
+	der, err := MarshalSm2PrivateKey(key, pwd) //Convert private key to DER format
+	if err != nil {
+		return nil, err
+	}
+	if pwd != nil {
+		block = &pem.Block{
+			Type:  "ENCRYPTED EC PRIVATE KEY",
+			Bytes: der,
+		}
+	} else {
+		block = &pem.Block{
+			Type:  "EC PRIVATE KEY",
+			Bytes: der,
+		}
+	}
+	///result []byte = new byte[];
+	secp256r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301})
+	if err != nil {
+		return nil, err
+	}
+	certHeader := pem.EncodeToMemory(&pem.Block{Type: "EC PARAMETERS", Bytes: secp256r1})
+	certPem := pem.EncodeToMemory(block)
+	result := append(certHeader[:], certPem[:]...)
+	log.Printf("write key:%s", result)
+	return result, nil
 }
 
 func ReadPublicKeyFromPem(publicKeyPem []byte) (*sm2.PublicKey, error) {

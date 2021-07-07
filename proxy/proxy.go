@@ -10,9 +10,9 @@ import (
 
 	"net/http"
 
-	"github.com/whiskerman/go-mitmproxy/fosafercert"
-
+	"github.com/whiskerman/gmsm/gmtls"
 	x509 "github.com/whiskerman/gmsm/x509"
+	"github.com/whiskerman/go-mitmproxy/fosafercert"
 
 	_log "github.com/sirupsen/logrus"
 	"github.com/whiskerman/go-mitmproxy/addon"
@@ -66,15 +66,14 @@ func NewProxy(opts *Options) (*Proxy, error) {
 			ExpectContinueTimeout: 1 * time.Second,
 			ForceAttemptHTTP2:     false, // disable http2
 			DisableCompression:    true,  // To get the original response from the server, set Transport.DisableCompression to true.
-			/*	TLSClientConfig: &tls.Config{
-					GMSupport:          &tls.GMSupport{},
-					RootCAs:            certPool,
-					InsecureSkipVerify: true,
-					KeyLogWriter:       GetTlsKeyLogWriter(),
-					Certificates:       []gmtls.Certificate{}, //[]gmtls.Certificate{}, //
+			TLSClientConfig: &gmtls.Config{
+				GMSupport:          &gmtls.GMSupport{},
+				RootCAs:            certPool,
+				InsecureSkipVerify: true,
+				KeyLogWriter:       GetTlsKeyLogWriter(),
+				Certificates:       []gmtls.Certificate{}, //[]gmtls.Certificate{}, //
 
-				},
-			*/
+			},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			// 禁止自动重定向

@@ -7,7 +7,10 @@ package websocket
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
+
+	"github.com/whiskerman/gmsm/gmtls"
+
+	//"crypto/tls"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -65,7 +68,7 @@ type Dialer struct {
 
 	// TLSClientConfig specifies the TLS configuration to use with tls.Client.
 	// If nil, the default configuration is used.
-	TLSClientConfig *tls.Config
+	TLSClientConfig *gmtls.Config
 
 	// HandshakeTimeout specifies the duration for the handshake to complete.
 	HandshakeTimeout time.Duration
@@ -309,7 +312,7 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string, requestHeader h
 		if cfg.ServerName == "" {
 			cfg.ServerName = hostNoPort
 		}
-		tlsConn := tls.Client(netConn, cfg)
+		tlsConn := gmtls.Client(netConn, cfg)
 		netConn = tlsConn
 
 		var err error
@@ -382,7 +385,7 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string, requestHeader h
 	return conn, resp, nil
 }
 
-func doHandshake(tlsConn *tls.Conn, cfg *tls.Config) error {
+func doHandshake(tlsConn *gmtls.Conn, cfg *gmtls.Config) error {
 	if err := tlsConn.Handshake(); err != nil {
 		return err
 	}

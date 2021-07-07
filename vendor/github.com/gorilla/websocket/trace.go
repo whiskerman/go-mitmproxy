@@ -3,11 +3,12 @@
 package websocket
 
 import (
-	"crypto/tls"
+	"github.com/whiskerman/gmsm/gmtls"
+	//"crypto/tls"
 	"net/http/httptrace"
 )
 
-func doHandshakeWithTrace(trace *httptrace.ClientTrace, tlsConn *tls.Conn, cfg *tls.Config) error {
+func doHandshakeWithTrace(trace *httptrace.ClientTrace, tlsConn *gmtls.Conn, cfg *gmtls.Config) error {
 	if trace.TLSHandshakeStart != nil {
 		trace.TLSHandshakeStart()
 	}

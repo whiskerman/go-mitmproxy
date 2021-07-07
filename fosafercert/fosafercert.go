@@ -22,7 +22,8 @@ import (
 	"github.com/golang/groupcache/lru"
 	"github.com/golang/groupcache/singleflight"
 	_log "github.com/sirupsen/logrus"
-	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/gmsm/gmtls"
+
 	"github.com/whiskerman/gmsm/sm2"
 	x509 "github.com/whiskerman/gmsm/x509"
 )
@@ -557,12 +558,12 @@ func (ca *CA) saveRSACert() error {
 	return ca.saveRSACertTo(file)
 }
 
-func (ca *CA) GetRSACert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) GetRSACert(commonName string) (*gmtls.Certificate, error) {
 	ca.cacheMu.Lock()
 	if val, ok := ca.cache.Get(commonName); ok {
 		ca.cacheMu.Unlock()
 		log.WithField("commonName", commonName).Debug("GetRSACert")
-		return val.(*tls.Certificate), nil
+		return val.(*gmtls.Certificate), nil
 	}
 	ca.cacheMu.Unlock()
 
@@ -580,11 +581,11 @@ func (ca *CA) GetRSACert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	return val.(*tls.Certificate), nil
+	return val.(*gmtls.Certificate), nil
 }
 
 // TODO: 是否应该支持多个 SubjectAltName
-func (ca *CA) DummyRSACert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) DummyRSACert(commonName string) (*gmtls.Certificate, error) {
 	log.WithField("commonName", commonName).Debug("DummyCert")
 	template := &sx509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
@@ -610,7 +611,7 @@ func (ca *CA) DummyRSACert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	cert := &tls.Certificate{
+	cert := &gmtls.Certificate{
 		Certificate: [][]byte{certBytes},
 		PrivateKey:  &ca.rsaPrivateKey,
 	}
@@ -618,12 +619,12 @@ func (ca *CA) DummyRSACert(commonName string) (*tls.Certificate, error) {
 	return cert, nil
 }
 
-func (ca *CA) GetSM2SignCert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) GetSM2SignCert(commonName string) (*gmtls.Certificate, error) {
 	ca.smsigncacheMu.Lock()
 	if val, ok := ca.smsigncache.Get(commonName); ok {
 		ca.smsigncacheMu.Unlock()
 		log.WithField("commonName", commonName).Debug("GetSM2SignCert")
-		return val.(*tls.Certificate), nil
+		return val.(*gmtls.Certificate), nil
 	}
 	ca.smsigncacheMu.Unlock()
 
@@ -641,15 +642,15 @@ func (ca *CA) GetSM2SignCert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	return val.(*tls.Certificate), nil
+	return val.(*gmtls.Certificate), nil
 }
 
-func (ca *CA) GetSM2EncCert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) GetSM2EncCert(commonName string) (*gmtls.Certificate, error) {
 	ca.smenccacheMu.Lock()
 	if val, ok := ca.smenccache.Get(commonName); ok {
 		ca.smenccacheMu.Unlock()
 		log.WithField("commonName", commonName).Debug("GetSM2SignCert")
-		return val.(*tls.Certificate), nil
+		return val.(*gmtls.Certificate), nil
 	}
 	ca.smenccacheMu.Unlock()
 
@@ -667,11 +668,11 @@ func (ca *CA) GetSM2EncCert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	return val.(*tls.Certificate), nil
+	return val.(*gmtls.Certificate), nil
 }
 
 // TODO: 是否应该支持多个 SubjectAltName
-func (ca *CA) DummySM2SignCert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) DummySM2SignCert(commonName string) (*gmtls.Certificate, error) {
 	log.WithField("commonName", commonName).Debug("DummyCert")
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
@@ -698,14 +699,14 @@ func (ca *CA) DummySM2SignCert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	cert := &tls.Certificate{
+	cert := &gmtls.Certificate{
 		Certificate: [][]byte{certBytes},
 		PrivateKey:  &ca.RootSM2SignKey,
 	}
 
 	return cert, nil
 }
-func (ca *CA) DummySM2EncCert(commonName string) (*tls.Certificate, error) {
+func (ca *CA) DummySM2EncCert(commonName string) (*gmtls.Certificate, error) {
 	log.WithField("commonName", commonName).Debug("DummyCert")
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
@@ -732,7 +733,7 @@ func (ca *CA) DummySM2EncCert(commonName string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	cert := &tls.Certificate{
+	cert := &gmtls.Certificate{
 		Certificate: [][]byte{certBytes},
 		PrivateKey:  &ca.RootSM2EncKey,
 	}

@@ -7,6 +7,9 @@ import (
 
 	"net/http"
 
+	"github.com/whiskerman/gmsm/gmtls"
+	//"crypto/tls"
+
 	"github.com/whiskerman/go-mitmproxy/fosafercert"
 )
 
@@ -69,44 +72,43 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		Proxy: proxy,
 		CA:    ca,
 	}
-	/*
-		fncGetSignCertKeypair := func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			gmFlag := false
-			// 检查支持协议中是否包含GMSSL
-			for _, v := range info.SupportedVersions {
-				if v == tls.VersionGMSSL {
-					log.Printf("ssl version:%v", v)
-					gmFlag = true
-					break
-				}
-			}
 
-			if gmFlag {
-				log.Printf("gmssl sign info:%v", info)
-				return ca.GetSM2SignCert(info.ServerName)
-			} else {
-				log.Printf("rsa ssl info:%v", info)
-				return ca.GetRSACert(info.ServerName)
+	fncGetSignCertKeypair := func(info *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
+		gmFlag := false
+		// 检查支持协议中是否包含GMSSL
+		for _, v := range info.SupportedVersions {
+			if v == gmtls.VersionGMSSL {
+				log.Printf("ssl version:%v", v)
+				gmFlag = true
+				break
 			}
 		}
 
-		fncGetEncCertKeypair := func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			log.Printf("gm ssl enc info:%v", info)
-			return ca.GetSM2EncCert(info.ServerName)
+		if gmFlag {
+			log.Printf("gmssl sign info:%v", info)
+			return ca.GetSM2SignCert(info.ServerName)
+		} else {
+			log.Printf("rsa ssl info:%v", info)
+			return ca.GetRSACert(info.ServerName)
 		}
-		support := &tls.GMSupport{WorkMode: tls.ModeAutoSwitch} //NewGMSupport()
-		support.EnableMixMode()
-	*/
+	}
+
+	fncGetEncCertKeypair := func(info *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
+		log.Printf("gm ssl enc info:%v", info)
+		return ca.GetSM2EncCert(info.ServerName)
+	}
+	support := &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch} //NewGMSupport()
+	support.EnableMixMode()
+
 	log.Println("before create server....")
 	server := &http.Server{
-		Handler: m,
-		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
-		/*TLSConfig: &tls.Config{
+		Handler:      m,
+		TLSNextProto: make(map[string]func(*http.Server, *gmtls.Conn, http.Handler)), // disable http2
+		TLSConfig: &gmtls.Config{
 			GMSupport:        support,
 			GetCertificate:   fncGetSignCertKeypair,
 			GetKECertificate: fncGetEncCertKeypair,
 		},
-		*/
 	}
 
 	m.Server = server

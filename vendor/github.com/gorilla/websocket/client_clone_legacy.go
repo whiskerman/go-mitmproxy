@@ -6,17 +6,21 @@
 
 package websocket
 
-import "crypto/tls"
+import (
+	"github.com/whiskerman/gmsm/gmtls"
+	
+	//"crypto/tls"
+)
 
 // cloneTLSConfig clones all public fields except the fields
 // SessionTicketsDisabled and SessionTicketKey. This avoids copying the
 // sync.Mutex in the sync.Once and makes it safe to call cloneTLSConfig on a
 // config in active use.
-func cloneTLSConfig(cfg *tls.Config) *tls.Config {
+func cloneTLSConfig(cfg *gmtls.Config) *gmtls.Config {
 	if cfg == nil {
-		return &tls.Config{}
+		return &gmtls.Config{}
 	}
-	return &tls.Config{
+	return &gmtls.Config{
 		Rand:                     cfg.Rand,
 		Time:                     cfg.Time,
 		Certificates:             cfg.Certificates,

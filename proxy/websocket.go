@@ -7,9 +7,9 @@ import (
 
 	"net/http/httputil"
 
-	http "net/http"
+	"net/http"
 
-	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/gmsm/gmtls"
 )
 
 // 当前仅做了转发 websocket 流量
@@ -53,7 +53,7 @@ func (s *WebSocket) WSS(res http.ResponseWriter, req *http.Request) {
 	if !strings.Contains(host, ":") {
 		host = host + ":443"
 	}
-	conn, err := tls.Dial("tcp", host, nil)
+	conn, err := gmtls.Dial("tcp", host, nil)
 	if err != nil {
 		log.Errorf("tls.Dial: %v\n", err)
 		return

@@ -3,10 +3,8 @@ package websvr
 import (
 	"io/ioutil"
 
-	tls "github.com/whiskerman/gmsm/gmtls"
+	"github.com/whiskerman/gmsm/gmtls"
 	"github.com/whiskerman/gmsm/x509"
-
-	x "github.com/whiskerman/gmsm/x509"
 )
 
 const (
@@ -25,61 +23,61 @@ const (
 )
 
 // RSA配置
-func loadRsaConfig() (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(rsaCertPath, rsaKeyPath)
+func loadRsaConfig() (*gmtls.Config, error) {
+	cert, err := gmtls.LoadX509KeyPair(rsaCertPath, rsaKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
+	return &gmtls.Config{Certificates: []gmtls.Certificate{cert}}, nil
 }
 
 // SM2配置
-func loadSM2Config() (*tls.Config, error) {
-	sigCert, err := tls.LoadX509KeyPair(sm2SignCertPath, sm2SignKeyPath)
+func loadSM2Config() (*gmtls.Config, error) {
+	sigCert, err := gmtls.LoadX509KeyPair(sm2SignCertPath, sm2SignKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	encCert, err := tls.LoadX509KeyPair(sm2EncCertPath, sm2EncKeyPath)
+	encCert, err := gmtls.LoadX509KeyPair(sm2EncCertPath, sm2EncKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{
-		GMSupport:    &tls.GMSupport{},
-		Certificates: []tls.Certificate{sigCert, encCert},
+	return &gmtls.Config{
+		GMSupport:    &gmtls.GMSupport{},
+		Certificates: []gmtls.Certificate{sigCert, encCert},
 	}, nil
 }
 
 // 切换GMSSL/TSL
-func loadAutoSwitchConfig() (*tls.Config, error) {
-	rsaKeypair, err := tls.LoadX509KeyPair(rsaCertPath, rsaKeyPath)
+func loadAutoSwitchConfig() (*gmtls.Config, error) {
+	rsaKeypair, err := gmtls.LoadX509KeyPair(rsaCertPath, rsaKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	sigCert, err := tls.LoadX509KeyPair(sm2SignCertPath, sm2SignKeyPath)
+	sigCert, err := gmtls.LoadX509KeyPair(sm2SignCertPath, sm2SignKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	encCert, err := tls.LoadX509KeyPair(sm2EncCertPath, sm2EncKeyPath)
+	encCert, err := gmtls.LoadX509KeyPair(sm2EncCertPath, sm2EncKeyPath)
 	if err != nil {
 		return nil, err
 
 	}
-	return tls.NewBasicAutoSwitchConfig(&sigCert, &encCert, &rsaKeypair)
+	return gmtls.NewBasicAutoSwitchConfig(&sigCert, &encCert, &rsaKeypair)
 }
 
 // 要求客户端身份认证
-func loadAutoSwitchConfigClientAuth() (*tls.Config, error) {
+func loadAutoSwitchConfigClientAuth() (*gmtls.Config, error) {
 	config, err := loadAutoSwitchConfig()
 	if err != nil {
 		return nil, err
 	}
 	// 设置需要客户端证书请求，标识需要进行客户端的身份认证
-	config.ClientAuth = tls.RequireAndVerifyClientCert
+	config.ClientAuth = gmtls.RequireAndVerifyClientCert
 	return config, nil
 }
 
 // 获取 客户端服务端双向身份认证 配置
-func bothAuthConfig() (*tls.Config, error) {
+func bothAuthConfig() (*gmtls.Config, error) {
 	// 信任的根证书
 	certPool := x509.NewCertPool()
 	cacert, err := ioutil.ReadFile(SM2CaCertPath)
@@ -87,21 +85,21 @@ func bothAuthConfig() (*tls.Config, error) {
 		return nil, err
 	}
 	certPool.AppendCertsFromPEM(cacert)
-	authKeypair, err := tls.LoadX509KeyPair(SM2AuthCertPath, SM2AuthKeyPath)
+	authKeypair, err := gmtls.LoadX509KeyPair(SM2AuthCertPath, SM2AuthKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{
-		GMSupport:          &tls.GMSupport{},
+	return &gmtls.Config{
+		GMSupport:          &gmtls.GMSupport{},
 		RootCAs:            certPool,
-		Certificates:       []tls.Certificate{authKeypair},
+		Certificates:       []gmtls.Certificate{authKeypair},
 		InsecureSkipVerify: false,
 	}, nil
 
 }
 
 // 获取 单向身份认证（只认证服务端） 配置
-func singleSideAuthConfig() (*tls.Config, error) {
+func singleSideAuthConfig() (*gmtls.Config, error) {
 	// 信任的根证书
 	certPool := x509.NewCertPool()
 	cacert, err := ioutil.ReadFile(SM2CaCertPath)
@@ -110,46 +108,46 @@ func singleSideAuthConfig() (*tls.Config, error) {
 	}
 	certPool.AppendCertsFromPEM(cacert)
 
-	return &tls.Config{
-		GMSupport: &tls.GMSupport{},
+	return &gmtls.Config{
+		GMSupport: &gmtls.GMSupport{},
 		RootCAs:   certPool,
 	}, nil
 }
 
 // 获取 客户端服务端双向身份认证 配置
-func rsaBothAuthConfig() (*tls.Config, error) {
+func rsaBothAuthConfig() (*gmtls.Config, error) {
 	// 信任的根证书
-	certPool := x.NewCertPool()
+	certPool := x509.NewCertPool()
 	cacert, err := ioutil.ReadFile(RSACaCertPath)
 	if err != nil {
 		return nil, err
 	}
 	certPool.AppendCertsFromPEM(cacert)
-	authKeypair, err := tls.LoadX509KeyPair(RSAAuthCertPath, RSAAuthKeyPath)
+	authKeypair, err := gmtls.LoadX509KeyPair(RSAAuthCertPath, RSAAuthKeyPath)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{
-		MaxVersion:         tls.VersionTLS12,
+	return &gmtls.Config{
+		MaxVersion:         gmtls.VersionTLS12,
 		RootCAs:            certPool,
-		Certificates:       []tls.Certificate{authKeypair},
+		Certificates:       []gmtls.Certificate{authKeypair},
 		InsecureSkipVerify: false,
 	}, nil
 
 }
 
 // 获取 单向身份认证（只认证服务端） 配置
-func rsaSingleSideAuthConfig() (*tls.Config, error) {
+func rsaSingleSideAuthConfig() (*gmtls.Config, error) {
 	// 信任的根证书
-	certPool := x.NewCertPool()
+	certPool := x509.NewCertPool()
 	cacert, err := ioutil.ReadFile(RSACaCertPath)
 	if err != nil {
 		return nil, err
 	}
 	certPool.AppendCertsFromPEM(cacert)
 
-	return &tls.Config{
-		MaxVersion: tls.VersionTLS12,
+	return &gmtls.Config{
+		MaxVersion: gmtls.VersionTLS12,
 		RootCAs:    certPool,
 	}, nil
 }
