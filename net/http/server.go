@@ -10,7 +10,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +29,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"golang.org/x/net/http/httpguts"
 )
 
@@ -905,6 +905,20 @@ func appendTime(b []byte, t time.Time) []byte {
 
 var errTooLarge = errors.New("http: request too large")
 
+type body struct {
+	src          io.Reader
+	hdr          interface{}   // non-nil (Response or Request) value means read trailer
+	r            *bufio.Reader // underlying wire-format reader for the trailer
+	closing      bool          // is the connection to be closed after reading body?
+	doEarlyClose bool          // whether Close should stop early
+
+	mu         sync.Mutex // guards following, and calls to Read and Close
+	sawEOF     bool
+	closed     bool
+	earlyClose bool   // Close called and we didn't read to the end of src
+	onHitEOF   func() // if non-nil, func to call when EOF is Read
+}
+
 func isH2Upgrade(r *http.Request) bool {
 	return r.Method == "PRI" && len(r.Header) == 0 && r.URL.Path == "*" && r.Proto == "HTTP/2.0"
 }
@@ -914,6 +928,237 @@ func wantsHttp10KeepAlive(r *http.Request) bool {
 		return false
 	}
 	return hasToken(getHeader(r.Header, "Connection"), "keep-alive")
+}
+
+func (b *body) Read(p []byte) (n int, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return 0, http.ErrBodyReadAfterClose
+	}
+	return b.readLocked(p)
+}
+
+// Must hold b.mu.
+func (b *body) readLocked(p []byte) (n int, err error) {
+	if b.sawEOF {
+		return 0, io.EOF
+	}
+	n, err = b.src.Read(p)
+
+	if err == io.EOF {
+		b.sawEOF = true
+		// Chunked case. Read the trailer.
+		if b.hdr != nil {
+			if e := b.readTrailer(); e != nil {
+				err = e
+				// Something went wrong in the trailer, we must not allow any
+				// further reads of any kind to succeed from body, nor any
+				// subsequent requests on the server connection. See
+				// golang.org/issue/12027
+				b.sawEOF = false
+				b.closed = true
+			}
+			b.hdr = nil
+		} else {
+			// If the server declared the Content-Length, our body is a LimitedReader
+			// and we need to check whether this EOF arrived early.
+			if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > 0 {
+				err = io.ErrUnexpectedEOF
+			}
+		}
+	}
+
+	// If we can return an EOF here along with the read data, do
+	// so. This is optional per the io.Reader contract, but doing
+	// so helps the HTTP transport code recycle its connection
+	// earlier (since it will see this EOF itself), even if the
+	// client doesn't do future reads or Close.
+	if err == nil && n > 0 {
+		if lr, ok := b.src.(*io.LimitedReader); ok && lr.N == 0 {
+			err = io.EOF
+			b.sawEOF = true
+		}
+	}
+
+	if b.sawEOF && b.onHitEOF != nil {
+		b.onHitEOF()
+	}
+
+	return n, err
+}
+
+var (
+	singleCRLF = []byte("\r\n")
+	doubleCRLF = []byte("\r\n\r\n")
+)
+
+func seeUpcomingDoubleCRLF(r *bufio.Reader) bool {
+	for peekSize := 4; ; peekSize++ {
+		// This loop stops when Peek returns an error,
+		// which it does when r's buffer has been filled.
+		buf, err := r.Peek(peekSize)
+		if bytes.HasSuffix(buf, doubleCRLF) {
+			return true
+		}
+		if err != nil {
+			break
+		}
+	}
+	return false
+}
+
+var errTrailerEOF = errors.New("http: unexpected EOF reading trailer")
+
+func (b *body) readTrailer() error {
+	// The common case, since nobody uses trailers.
+	buf, err := b.r.Peek(2)
+	if bytes.Equal(buf, singleCRLF) {
+		b.r.Discard(2)
+		return nil
+	}
+	if len(buf) < 2 {
+		return errTrailerEOF
+	}
+	if err != nil {
+		return err
+	}
+
+	// Make sure there's a header terminator coming up, to prevent
+	// a DoS with an unbounded size Trailer. It's not easy to
+	// slip in a LimitReader here, as textproto.NewReader requires
+	// a concrete *bufio.Reader. Also, we can't get all the way
+	// back up to our conn's LimitedReader that *might* be backing
+	// this bufio.Reader. Instead, a hack: we iteratively Peek up
+	// to the bufio.Reader's max size, looking for a double CRLF.
+	// This limits the trailer to the underlying buffer size, typically 4kB.
+	if !seeUpcomingDoubleCRLF(b.r) {
+		return errors.New("http: suspiciously long trailer after chunked body")
+	}
+
+	hdr, err := textproto.NewReader(b.r).ReadMIMEHeader()
+	if err != nil {
+		if err == io.EOF {
+			return errTrailerEOF
+		}
+		return err
+	}
+	switch rr := b.hdr.(type) {
+	case *http.Request:
+		mergeSetHeader(&rr.Trailer, http.Header(hdr))
+	case *http.Response:
+		mergeSetHeader(&rr.Trailer, http.Header(hdr))
+	}
+	return nil
+}
+
+func mergeSetHeader(dst *http.Header, src http.Header) {
+	if *dst == nil {
+		*dst = src
+		return
+	}
+	for k, vv := range src {
+		(*dst)[k] = vv
+	}
+}
+
+// unreadDataSizeLocked returns the number of bytes of unread input.
+// It returns -1 if unknown.
+// b.mu must be held.
+func (b *body) unreadDataSizeLocked() int64 {
+	if lr, ok := b.src.(*io.LimitedReader); ok {
+		return lr.N
+	}
+	return -1
+}
+
+func (b *body) Close() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return nil
+	}
+	var err error
+	switch {
+	case b.sawEOF:
+		// Already saw EOF, so no need going to look for it.
+	case b.hdr == nil && b.closing:
+		// no trailer and closing the connection next.
+		// no point in reading to EOF.
+	case b.doEarlyClose:
+		// Read up to maxPostHandlerReadBytes bytes of the body, looking
+		// for EOF (and trailers), so we can re-use this connection.
+		if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > maxPostHandlerReadBytes {
+			// There was a declared Content-Length, and we have more bytes remaining
+			// than our maxPostHandlerReadBytes tolerance. So, give up.
+			b.earlyClose = true
+		} else {
+			var n int64
+			// Consume the body, or, which will also lead to us reading
+			// the trailer headers after the body, if present.
+			n, err = io.CopyN(io.Discard, bodyLocked{b}, maxPostHandlerReadBytes)
+			if err == io.EOF {
+				err = nil
+			}
+			if n == maxPostHandlerReadBytes {
+				b.earlyClose = true
+			}
+		}
+	default:
+		// Fully consume the body, which will also lead to us reading
+		// the trailer headers after the body, if present.
+		_, err = io.Copy(io.Discard, bodyLocked{b})
+	}
+	b.closed = true
+	return err
+}
+
+func (b *body) didEarlyClose() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.earlyClose
+}
+
+// bodyRemains reports whether future Read calls might
+// yield data.
+func (b *body) bodyRemains() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.sawEOF
+}
+
+func (b *body) registerOnHitEOF(fn func()) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.onHitEOF = fn
+}
+
+// bodyLocked is a io.Reader reading from a *body when its mutex is
+// already held.
+type bodyLocked struct {
+	b *body
+}
+
+func (bl bodyLocked) Read(p []byte) (n int, err error) {
+	if bl.b.closed {
+		return 0, http.ErrBodyReadAfterClose
+	}
+	return bl.b.readLocked(p)
+}
+
+// parseContentLength trims whitespace from s and returns -1 if no value
+// is set, or the value if it's >= 0.
+func parseContentLength(cl string) (int64, error) {
+	cl = textproto.TrimString(cl)
+	if cl == "" {
+		return -1, nil
+	}
+	n, err := strconv.ParseUint(cl, 10, 63)
+	if err != nil {
+		return 0, badStringError("bad Content-Length", cl)
+	}
+	return int64(n), nil
+
 }
 
 // Read next request from connection.
@@ -1186,6 +1431,22 @@ func bodyAllowedForStatus(status int) bool {
 	return true
 }
 
+var (
+	suppressedHeaders304    = []string{"Content-Type", "Content-Length", "Transfer-Encoding"}
+	suppressedHeadersNoBody = []string{"Content-Length", "Transfer-Encoding"}
+)
+
+func suppressedHeaders(status int) []string {
+	switch {
+	case status == 304:
+		// RFC 7232 section 4.1
+		return suppressedHeaders304
+	case !bodyAllowedForStatus(status):
+		return suppressedHeadersNoBody
+	}
+	return nil
+}
+
 // writeHeader finalizes the header sent to the client and writes it
 // to cw.res.conn.bufw.
 //
@@ -1389,7 +1650,7 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		}
 	}
 
-	if header.Get("Date") != "" {
+	if !hasHeader(header, "Date") {
 		setHeader.date = appendTime(cw.res.dateBuf[:0], time.Now())
 	}
 
@@ -1779,6 +2040,18 @@ func (e statusError) Error() string { return http.StatusText(e.code) + ": " + e.
 // trace to the server's error log.
 var ErrAbortHandler = errors.New("net/http: abort Handler")
 
+type unsupportedTEError struct {
+	err string
+}
+
+func (uste *unsupportedTEError) Error() string {
+	return uste.err
+}
+func isUnsupportedTEError(err error) bool {
+	_, ok := err.(*unsupportedTEError)
+	return ok
+}
+
 // isCommonNetReadError reports whether err is a common error
 // encountered during reading a request off the network when the
 // client has gone away or had its read fail somehow. This is used to
@@ -1823,10 +2096,10 @@ func (c *conn) serve(ctx context.Context) {
 		if err := tlsConn.Handshake(); err != nil {
 			// If the handshake failed due to the client not speaking
 			// TLS, assume they're speaking plaintext HTTP and write a
-			// 400 response on the TLS conn's underlying net.Conn.
-			if re, ok := err.(tls.RecordHeaderError); ok && re.Conn != nil && tlsRecordHeaderLooksLikeHTTP(re.RecordHeader) {
-				io.WriteString(re.Conn, "HTTP/1.0 400 Bad Request\r\n\r\nClient sent an HTTP request to an HTTPS server.\n")
-				re.Conn.Close()
+			// 400 response on the TLS conn's underlying net.Conn.//&& re.Conn != nil
+			if re, ok := err.(tls.RecordHeaderError); ok && tlsRecordHeaderLooksLikeHTTP(re.RecordHeader) {
+				//io.WriteString(re.Conn, "HTTP/1.0 400 Bad Request\r\n\r\nClient sent an HTTP request to an HTTPS server.\n")
+				//re.Conn.Close()
 				return
 			}
 			c.server.logf("http: TLS handshake error from %s: %v", c.rwc.RemoteAddr(), err)

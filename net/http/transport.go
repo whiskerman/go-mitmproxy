@@ -14,7 +14,8 @@ import (
 	"compress/gzip"
 	"container/list"
 	"context"
-	"crypto/tls"
+
+	//tls "crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	tls "github.com/whiskerman/gmsm/gmtls"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http/httpproxy"
 	"golang.org/x/net/idna"
@@ -1644,13 +1646,13 @@ func (pconn *persistConn) addTLS(name string, trace *httptrace.ClientTrace) erro
 	if err := <-errc; err != nil {
 		plainConn.Close()
 		if trace != nil && trace.TLSHandshakeDone != nil {
-			trace.TLSHandshakeDone(tls.ConnectionState{}, err)
+			//	trace.TLSHandshakeDone(tls.ConnectionState{}, err)
 		}
 		return err
 	}
 	cs := tlsConn.ConnectionState()
 	if trace != nil && trace.TLSHandshakeDone != nil {
-		trace.TLSHandshakeDone(cs, nil)
+		//	trace.TLSHandshakeDone(cs, nil)
 	}
 	pconn.tlsState = &cs
 	pconn.conn = tlsConn
@@ -1694,13 +1696,13 @@ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (pconn *pers
 			if err := tc.Handshake(); err != nil {
 				go pconn.conn.Close()
 				if trace != nil && trace.TLSHandshakeDone != nil {
-					trace.TLSHandshakeDone(tls.ConnectionState{}, err)
+					//trace.TLSHandshakeDone(tls.ConnectionState{}, err)
 				}
 				return nil, err
 			}
 			cs := tc.ConnectionState()
 			if trace != nil && trace.TLSHandshakeDone != nil {
-				trace.TLSHandshakeDone(cs, nil)
+				//trace.TLSHandshakeDone(cs, nil)
 			}
 			pconn.tlsState = &cs
 		}
@@ -2532,169 +2534,6 @@ var reqWriteExcludeHeader = map[string]bool{
 	"Trailer":           true,
 }
 
-func write(r *http.Request, w io.Writer, usingProxy bool, extraHeaders http.Header, waitForContinue func() bool) (err error) {
-	trace := httptrace.ContextClientTrace(r.Context())
-	if trace != nil && trace.WroteRequest != nil {
-		defer func() {
-			trace.WroteRequest(httptrace.WroteRequestInfo{
-				Err: err,
-			})
-		}()
-	}
-	closed := false
-	defer func() {
-		if closed {
-			return
-		}
-		if closeErr := closeBody(r); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-
-	// Find the target host. Prefer the Host: header, but if that
-	// is not given, use the host from the request URL.
-	//
-	// Clean the host, in case it arrives with unexpected stuff in it.
-	host := cleanHost(r.Host)
-	if host == "" {
-		if r.URL == nil {
-			return errMissingHost
-		}
-		host = cleanHost(r.URL.Host)
-	}
-
-	// According to RFC 6874, an HTTP client, proxy, or other
-	// intermediary must remove any IPv6 zone identifier attached
-	// to an outgoing URI.
-	host = removeZone(host)
-
-	ruri := r.URL.RequestURI()
-	if usingProxy && r.URL.Scheme != "" && r.URL.Opaque == "" {
-		ruri = r.URL.Scheme + "://" + host + ruri
-	} else if r.Method == "CONNECT" && r.URL.Path == "" {
-		// CONNECT requests normally give just the host and port, not a full URL.
-		ruri = host
-		if r.URL.Opaque != "" {
-			ruri = r.URL.Opaque
-		}
-	}
-	if stringContainsCTLByte(ruri) {
-		return errors.New("net/http: can't write control character in Request.URL")
-	}
-	// TODO: validate r.Method too? At least it's less likely to
-	// come from an attacker (more likely to be a constant in
-	// code).
-
-	// Wrap the writer in a bufio Writer if it's not already buffered.
-	// Don't always call NewWriter, as that forces a bytes.Buffer
-	// and other small bufio Writers to have a minimum 4k buffer
-	// size.
-	var bw *bufio.Writer
-	if _, ok := w.(io.ByteWriter); !ok {
-		bw = bufio.NewWriter(w)
-		w = bw
-	}
-
-	_, err = fmt.Fprintf(w, "%s %s HTTP/1.1\r\n", valueOrDefault(r.Method, "GET"), ruri)
-	if err != nil {
-		return err
-	}
-
-	// Header lines
-	_, err = fmt.Fprintf(w, "Host: %s\r\n", host)
-	if err != nil {
-		return err
-	}
-	if trace != nil && trace.WroteHeaderField != nil {
-		trace.WroteHeaderField("Host", []string{host})
-	}
-
-	// Use the defaultUserAgent unless the Header contains one, which
-	// may be blank to not send the header.
-	userAgent := defaultUserAgent
-	if hasHeader(r.Header, "User-Agent") {
-		userAgent = r.Header.Get("User-Agent")
-	}
-	if userAgent != "" {
-		_, err = fmt.Fprintf(w, "User-Agent: %s\r\n", userAgent)
-		if err != nil {
-			return err
-		}
-		if trace != nil && trace.WroteHeaderField != nil {
-			trace.WroteHeaderField("User-Agent", []string{userAgent})
-		}
-	}
-
-	// Process Body,ContentLength,Close,Trailer
-	tw, err := NewTransferWriter_S(r)
-	if err != nil {
-		return err
-	}
-	err = tw.writeHeader(w, trace)
-	if err != nil {
-		return err
-	}
-
-	err = r.Header.WriteSubset(w, reqWriteExcludeHeader)
-	if err != nil {
-		return err
-	}
-
-	if extraHeaders != nil {
-		err = extraHeaders.Write(w)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = io.WriteString(w, "\r\n")
-	if err != nil {
-		return err
-	}
-
-	if trace != nil && trace.WroteHeaders != nil {
-		trace.WroteHeaders()
-	}
-
-	// Flush and wait for 100-continue if expected.
-	if waitForContinue != nil {
-		if bw, ok := w.(*bufio.Writer); ok {
-			err = bw.Flush()
-			if err != nil {
-				return err
-			}
-		}
-		if trace != nil && trace.Wait100Continue != nil {
-			trace.Wait100Continue()
-		}
-		if !waitForContinue() {
-			closed = true
-			closeBody(r)
-			return nil
-		}
-	}
-
-	if bw, ok := w.(*bufio.Writer); ok && tw.FlushHeaders {
-		if err := bw.Flush(); err != nil {
-			return err
-		}
-	}
-
-	// Write body and trailer
-	closed = true
-	err = tw.writeBody(w)
-	if err != nil {
-		if tw.bodyReadError == err {
-			err = requestBodyReadError{err}
-		}
-		return err
-	}
-
-	if bw != nil {
-		return bw.Flush()
-	}
-	return nil
-}
 func idnaASCII(v string) (string, error) {
 	// TODO: Consider removing this check after verifying performance is okay.
 	// Right now punycode verification, length checks, context checks, and the
@@ -2780,7 +2619,7 @@ func (pc *persistConn) writeLoop() {
 		select {
 		case wr := <-pc.writech:
 			startBytesWritten := pc.nwrite
-			err := write(wr.req.Request, pc.bw, pc.isProxy, wr.req.extra, pc.waitForContinue(wr.continueCh))
+			err := wr.req.Request.Write_S(pc.bw, pc.isProxy, wr.req.extra, pc.waitForContinue(wr.continueCh))
 			if bre, ok := err.(requestBodyReadError); ok {
 				err = bre.error
 				// Errors reading from the user's

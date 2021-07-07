@@ -7,8 +7,6 @@ import (
 
 	"net/http"
 
-	xhttp "github.com/whiskerman/go-mitmproxy/net/http"
-
 	"github.com/whiskerman/go-mitmproxy/fosafercert"
 )
 
@@ -58,7 +56,7 @@ type Middle struct {
 	Proxy    *Proxy
 	CA       *fosafercert.CA
 	Listener net.Listener
-	Server   *xhttp.Server
+	Server   *http.Server
 }
 
 func NewMiddle(proxy *Proxy) (Interceptor, error) {
@@ -100,7 +98,7 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 		support.EnableMixMode()
 	*/
 	log.Println("before create server....")
-	server := &xhttp.Server{
+	server := &http.Server{
 		Handler: m,
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)), // disable http2
 		/*TLSConfig: &tls.Config{

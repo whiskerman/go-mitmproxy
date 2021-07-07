@@ -11,20 +11,19 @@ package http
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	xhttp "net/http"
 	"net/url"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	tls "github.com/whiskerman/gmsm/gmtls"
 )
 
 // A Client is an HTTP client. Its zero value (DefaultClient) is a
@@ -76,7 +75,7 @@ type Client struct {
 	//
 	// If CheckRedirect is nil, the Client uses its default policy,
 	// which is to stop after 10 consecutive requests.
-	CheckRedirect func(req *xhttp.Request, via []*xhttp.Request) error
+	CheckRedirect func(req *http.Request, via []*http.Request) error
 
 	// Jar specifies the cookie jar.
 	//
@@ -87,7 +86,7 @@ type Client struct {
 	//
 	// If Jar is nil, cookies are only sent if they are explicitly
 	// set on the Request.
-	Jar xhttp.CookieJar
+	Jar http.CookieJar
 
 	// Timeout specifies a time limit for requests made by this
 	// Client. The timeout includes connection time, any
@@ -140,7 +139,7 @@ type RoundTripper interface {
 	// must arrange to wait for the Close call before doing so.
 	//
 	// The Request's URL and Header fields must be initialized.
-	RoundTrip(*xhttp.Request) (*xhttp.Response, error)
+	RoundTrip(*http.Request) (*http.Response, error)
 }
 
 // refererForURL returns a referer without any authentication info or
@@ -168,7 +167,7 @@ func refererForURL(lastReq, newReq *url.URL) string {
 }
 
 // didTimeout is non-nil only if err != nil.
-func (c *Client) send(req *xhttp.Request, deadline time.Time) (resp *xhttp.Response, didTimeout func() bool, err error) {
+func (c *Client) send(req *http.Request, deadline time.Time) (resp *http.Response, didTimeout func() bool, err error) {
 	if c.Jar != nil {
 		for _, cookie := range c.Jar.Cookies(req.URL) {
 			req.AddCookie(cookie)
@@ -197,12 +196,12 @@ func (c *Client) transport() RoundTripper {
 	if c.Transport != nil {
 		return c.Transport
 	}
-	return xhttp.DefaultTransport
+	return http.DefaultTransport
 }
 
 // send issues an HTTP request.
 // Caller should close resp.Body when done reading from it.
-func send(ireq *xhttp.Request, rt RoundTripper, deadline time.Time) (resp *xhttp.Response, didTimeout func() bool, err error) {
+func send(ireq *http.Request, rt RoundTripper, deadline time.Time) (resp *http.Response, didTimeout func() bool, err error) {
 	req := ireq // req is either the original request, or a modified fork
 
 	if rt == nil {
@@ -224,7 +223,7 @@ func send(ireq *xhttp.Request, rt RoundTripper, deadline time.Time) (resp *xhttp
 	// time it's called.
 	forkReq := func() {
 		if ireq == req {
-			req = new(xhttp.Request)
+			req = new(http.Request)
 			*req = *ireq // shallow clone
 		}
 	}
@@ -234,9 +233,9 @@ func send(ireq *xhttp.Request, rt RoundTripper, deadline time.Time) (resp *xhttp
 	// Transport that this has been initialized, though.
 	if req.Header == nil {
 		forkReq()
-		req.Header = make(xhttp.Header)
+		req.Header = make(http.Header)
 	}
-
+	hasHeader(req.Header, "Authorization")
 	if u := req.URL.User; u != nil && req.Header.Get("Authorization") == "" {
 		username := u.Username()
 		password, _ := u.Password()
@@ -311,7 +310,7 @@ func timeBeforeContextDeadline(t time.Time, ctx context.Context) bool {
 // optional semantics (notably contexts). The Request is used
 // to check whether this particular request is using an alternate protocol,
 // in which case we need to check the RoundTripper for that protocol.
-func knownRoundTripperImpl(rt RoundTripper, req *xhttp.Request) bool {
+func knownRoundTripperImpl(rt RoundTripper, req *http.Request) bool {
 	switch t := rt.(type) {
 	case *Transport:
 		if altRT := t.alternateRoundTripper(req); altRT != nil {
@@ -342,7 +341,7 @@ func knownRoundTripperImpl(rt RoundTripper, req *xhttp.Request) bool {
 // Second was Request.Cancel.
 // Third was Request.Context.
 // This function populates the second and third, and uses the first if it really needs to.
-func setRequestCancel(req *xhttp.Request, rt RoundTripper, deadline time.Time) (stopTimer func(), didTimeout func() bool) {
+func setRequestCancel(req *http.Request, rt RoundTripper, deadline time.Time) (stopTimer func(), didTimeout func() bool) {
 	if deadline.IsZero() {
 		return nop, alwaysFalse
 	}
@@ -448,7 +447,7 @@ func basicAuth(username, password string) string {
 //
 // To make a request with custom headers, use NewRequest and
 // DefaultClient.Do.
-func Get(url string) (resp *xhttp.Response, err error) {
+func Get(url string) (resp *http.Response, err error) {
 	return DefaultClient.Get(url)
 }
 
@@ -587,18 +586,18 @@ func urlErrorOp(method string) string {
 // Any returned error will be of type *url.Error. The url.Error
 // value's Timeout method will report true if request timed out or was
 // canceled.
-func (c *Client) Do(req *http.Request) (*xhttp.Response, error) {
+func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return c.do(req)
 }
 
-var testHookClientDoResult func(retres *xhttp.Response, reterr error)
+var testHookClientDoResult func(retres *http.Response, reterr error)
 
-func closeBodyResp(r *xhttp.Response) {
+func closeBodyResp(r *http.Response) {
 	if r.Body != nil {
 		r.Body.Close()
 	}
 }
-func (c *Client) do(req *http.Request) (retres *xhttp.Response, reterr error) {
+func (c *Client) do(req *http.Request) (retres *http.Response, reterr error) {
 	if testHookClientDoResult != nil {
 		defer func() { testHookClientDoResult(retres, reterr) }()
 	}
@@ -759,7 +758,8 @@ func (c *Client) makeHeadersCopier(ireq *http.Request) func(*http.Request) {
 		ireqhdr  = cloneOrMakeHeader(ireq.Header)
 		icookies map[string][]*http.Cookie
 	)
-	if c.Jar != nil && ireq.Header.Get("Cookie") != "" {
+
+	if c.Jar != nil && hasHeader(ireq.Header, "Cookie") {
 		icookies = make(map[string][]*http.Cookie)
 		for _, c := range ireq.Cookies() {
 			icookies[c.Name] = append(icookies[c.Name], c)
