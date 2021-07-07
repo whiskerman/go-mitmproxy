@@ -1173,6 +1173,7 @@ func (h extraHeader) Write(w *bufio.Writer) {
 		}
 	}
 }
+
 func bodyAllowedForStatus(status int) bool {
 	switch {
 	case status >= 100 && status <= 199:

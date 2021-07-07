@@ -482,6 +482,7 @@ func (t *Transport) useRegisteredProtocol(req *http.Request) bool {
 	return true
 }
 
+
 // alternateRoundTripper returns the alternate RoundTripper to use
 // for this request if the Request's URL scheme requires one,
 // or nil for the normal case of using the Transport.
