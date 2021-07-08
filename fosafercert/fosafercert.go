@@ -3,7 +3,6 @@ package fosafercert
 import (
 	"crypto/rand"
 	"crypto/rsa"
-
 	sx509 "crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -108,7 +107,7 @@ func getStorePath(path string) (string, error) {
 			log.Println(err)
 		}
 		path = filepath.Dir(execpath)
-		path = filepath.Join(path, "certs")
+		path = filepath.Join(path, "pcerts")
 	}
 
 	if !filepath.IsAbs(path) {
@@ -199,7 +198,7 @@ func (ca *CA) caSM2EncKeyFile() string {
 
 // The certificate in PEM format.
 func (ca *CA) caSM2SignCertFile() string {
-	return filepath.Join(ca.StorePath, "signcert.pem")
+	return filepath.Join(ca.StorePath, "01.pem")
 }
 
 func (ca *CA) caSM2SignKeyFile() string {
@@ -208,7 +207,7 @@ func (ca *CA) caSM2SignKeyFile() string {
 
 // The certificate in PEM format.
 func (ca *CA) caSM2EncCertFile() string {
-	return filepath.Join(ca.StorePath, "enccert.pem")
+	return filepath.Join(ca.StorePath, "02.pem")
 }
 
 func (ca *CA) loadRSA() error {
@@ -681,6 +680,8 @@ func (ca *CA) DummySM2SignCert(commonName string) (*gmtls.Certificate, error) {
 			CommonName:   commonName,
 			Organization: []string{"FOSAFER"},
 		},
+		DNSNames:           []string{"www.example.com", "fosafer.example.com"},
+		IPAddresses:        []net.IP{net.IPv4(10, 10, 30, 172), net.IPv4(127, 0, 0, 1)},
 		NotBefore:          time.Now().Add(-time.Hour * 48),
 		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
 		SignatureAlgorithm: x509.SM2WithSM3,
@@ -694,15 +695,16 @@ func (ca *CA) DummySM2SignCert(commonName string) (*gmtls.Certificate, error) {
 	} else {
 		template.DNSNames = []string{commonName}
 	}
+	//sm2cacert, err := gmtls.LoadX509KeyPair(ca.caSM2CertFile(), ca.caSM2KeyFile())
 
-	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2SignCert, &ca.RootSM2SignKey.PublicKey, &ca.RootSM2SignKey)
+	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2Cert, &ca.sm2PrivateKey.PublicKey, &ca.sm2PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
 	cert := &gmtls.Certificate{
 		Certificate: [][]byte{certBytes},
-		PrivateKey:  &ca.RootSM2SignKey,
+		PrivateKey:  &ca.sm2PrivateKey,
 	}
 
 	return cert, nil
@@ -715,6 +717,8 @@ func (ca *CA) DummySM2EncCert(commonName string) (*gmtls.Certificate, error) {
 			CommonName:   commonName,
 			Organization: []string{"FOSAFER"},
 		},
+		DNSNames:           []string{"www.example.com", "fosafer.example.com"},
+		IPAddresses:        []net.IP{net.IPv4(10, 10, 30, 172), net.IPv4(127, 0, 0, 1)},
 		NotBefore:          time.Now().Add(-time.Hour * 48),
 		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
 		SignatureAlgorithm: x509.SM2WithSM3,
@@ -729,14 +733,14 @@ func (ca *CA) DummySM2EncCert(commonName string) (*gmtls.Certificate, error) {
 		template.DNSNames = []string{commonName}
 	}
 
-	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2EncCert, &ca.RootSM2EncKey.PublicKey, &ca.RootSM2EncKey)
+	certBytes, err := x509.CreateCertificate(template, &ca.RootSM2Cert, &ca.sm2PrivateKey.PublicKey, &ca.sm2PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
 	cert := &gmtls.Certificate{
 		Certificate: [][]byte{certBytes},
-		PrivateKey:  &ca.RootSM2EncKey,
+		PrivateKey:  &ca.sm2PrivateKey,
 	}
 
 	return cert, nil
