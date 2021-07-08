@@ -612,6 +612,7 @@ func (c *Config) Clone() *Config {
 		Renegotiation:               c.Renegotiation,
 		KeyLogWriter:                c.KeyLogWriter,
 		sessionTicketKeys:           sessionTicketKeys,
+		GetKECertificate:            c.GetKECertificate,
 	}
 }
 

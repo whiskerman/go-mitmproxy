@@ -94,11 +94,11 @@ func NewMiddle(proxy *Proxy) (Interceptor, error) {
 	}
 
 	fncGetEncCertKeypair := func(info *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
-		log.Printf("gm ssl enc info:%v", info)
+		log.Printf("^^^^^gm ssl enc info:%v", info)
 		return ca.GetSM2EncCert(info.ServerName)
 	}
-	support := &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch} //NewGMSupport()
-	support.EnableMixMode()
+	support := &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch} //gmtls.NewGMSupport()
+	//support.EnableMixMode()
 
 	log.Println("before create server....")
 	server := &http.Server{

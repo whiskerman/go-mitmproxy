@@ -49,6 +49,6 @@ func (addon *Log) Requestheaders(f *flow.Flow) {
 		if f.Response != nil && f.Response.Body != nil {
 			contentLen = len(f.Response.Body)
 		}
-		log.Infof("%v %v %v %v - %v ms\n", f.Request.Method, f.Request.URL.String(), StatusCode, contentLen, time.Since(start).Milliseconds())
+		log.Infof("%v %v %v %v - %v ms\n %s\n", f.Request.Method, f.Request.URL.String(), StatusCode, contentLen, time.Since(start).Milliseconds(), string(f.Response.Body))
 	}()
 }

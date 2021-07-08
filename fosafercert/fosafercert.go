@@ -185,7 +185,7 @@ func (ca *CA) caRSACertFile() string {
 }
 
 func (ca *CA) caSM2KeyFile() string {
-	return filepath.Join(ca.StorePath, "cakey.pem")
+	return filepath.Join(ca.StorePath, "cakeykey.pem")
 }
 
 // The certificate in PEM format.
@@ -265,11 +265,11 @@ func (ca *CA) load() error {
 		return err
 	}
 	log.Println("before load SM2")
-	/*err = ca.loadSM2()
+	err = ca.loadSM2()
 	if err != nil {
 		return err
 	}
-	*/
+
 	log.Println("before load SM2Sign")
 	err = ca.loadSM2Sign()
 	if err != nil {
@@ -674,6 +674,7 @@ func (ca *CA) GetSM2EncCert(commonName string) (*gmtls.Certificate, error) {
 // TODO: 是否应该支持多个 SubjectAltName
 func (ca *CA) DummySM2SignCert(commonName string) (*gmtls.Certificate, error) {
 	log.WithField("commonName", commonName).Debug("DummyCert")
+	log.Printf("DummySM2SignCert commonName:%s", commonName)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano() / 100000),
 		Subject: pkix.Name{
@@ -683,7 +684,7 @@ func (ca *CA) DummySM2SignCert(commonName string) (*gmtls.Certificate, error) {
 		NotBefore:          time.Now().Add(-time.Hour * 48),
 		NotAfter:           time.Now().Add(time.Hour * 24 * 365),
 		SignatureAlgorithm: x509.SM2WithSM3,
-		KeyUsage:           x509.KeyUsageCertSign,
+		KeyUsage:           x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:        []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 

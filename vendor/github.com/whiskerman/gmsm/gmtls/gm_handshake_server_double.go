@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"sync/atomic"
 
 	"github.com/whiskerman/gmsm/sm2"
@@ -39,6 +40,7 @@ type serverHandshakeStateGM struct {
 func (c *Conn) serverHandshakeGM() error {
 	// If this is the first server handshake, we generate a random key to
 	// encrypt the tickets with.
+	log.Println("##################serverHandshakeGM##################")
 	c.config.serverInitOnce.Do(func() { c.config.serverInit(nil) })
 
 	hs := serverHandshakeStateGM{
@@ -113,7 +115,7 @@ func (c *Conn) serverHandshakeGM() error {
 // whether we will perform session resumption.
 func (hs *serverHandshakeStateGM) readClientHello() (isResume bool, err error) {
 	c := hs.c
-
+	log.Println("##################readClientHello##################")
 	msg, err := c.readHandshake()
 	if err != nil {
 		return false, err
@@ -253,7 +255,7 @@ func (hs *serverHandshakeStateGM) checkForResumption() bool {
 	if c.config.SessionTicketsDisabled {
 		return false
 	}
-
+	log.Println("========checkForResumption==========")
 	var ok bool
 	var sessionTicket = append([]uint8{}, hs.clientHello.sessionTicket...)
 	if hs.sessionState, ok = c.decryptTicket(sessionTicket); !ok {
@@ -296,7 +298,7 @@ func (hs *serverHandshakeStateGM) checkForResumption() bool {
 
 func (hs *serverHandshakeStateGM) doResumeHandshake() error {
 	c := hs.c
-
+	log.Println("##################doResumeHandshake##################")
 	hs.hello.cipherSuite = hs.suite.id
 	// We echo the client's session ID in the ServerHello to let it know
 	// that we're doing a resumption.
@@ -323,11 +325,11 @@ func (hs *serverHandshakeStateGM) doResumeHandshake() error {
 
 func (hs *serverHandshakeStateGM) doFullHandshake() error {
 	c := hs.c
-
+	log.Println("##################doFullHandshake##################")
 	if hs.clientHello.ocspStapling && len(hs.cert[0].OCSPStaple) > 0 {
 		hs.hello.ocspStapling = true
 	}
-
+	
 	hs.hello.ticketSupported = hs.clientHello.ticketSupported && !c.config.SessionTicketsDisabled
 	hs.hello.cipherSuite = hs.suite.id
 
@@ -339,6 +341,7 @@ func (hs *serverHandshakeStateGM) doFullHandshake() error {
 	}
 	hs.finishedHash.Write(hs.clientHello.marshal())
 	hs.finishedHash.Write(hs.hello.marshal())
+	log.Println("#######doFullHandshake:before writeRecord##################")
 	if _, err := c.writeRecord(recordTypeHandshake, hs.hello.marshal()); err != nil {
 		return err
 	}
@@ -512,7 +515,7 @@ func (hs *serverHandshakeStateGM) doFullHandshake() error {
 
 func (hs *serverHandshakeStateGM) establishKeys() error {
 	c := hs.c
-
+	log.Println("##################establishKeys##################")
 	clientMAC, serverMAC, clientKey, serverKey, clientIV, serverIV :=
 		keysFromMasterSecret(c.vers, hs.suite, hs.masterSecret, hs.clientHello.random, hs.hello.random, hs.suite.macLen, hs.suite.keyLen, hs.suite.ivLen)
 
@@ -537,7 +540,7 @@ func (hs *serverHandshakeStateGM) establishKeys() error {
 
 func (hs *serverHandshakeStateGM) readFinished(out []byte) error {
 	c := hs.c
-
+	log.Println("##################readFinished##################")
 	c.readRecord(recordTypeChangeCipherSpec)
 	if c.in.err != nil {
 		return c.in.err
@@ -583,7 +586,7 @@ func (hs *serverHandshakeStateGM) sendSessionTicket() error {
 	if !hs.hello.ticketSupported {
 		return nil
 	}
-
+	log.Println("##################sendSessionTicket##################")
 	c := hs.c
 	m := new(newSessionTicketMsg)
 
@@ -609,7 +612,7 @@ func (hs *serverHandshakeStateGM) sendSessionTicket() error {
 
 func (hs *serverHandshakeStateGM) sendFinished(out []byte) error {
 	c := hs.c
-
+	log.Println("##################sendFinished##################")
 	if _, err := c.writeRecord(recordTypeChangeCipherSpec, []byte{1}); err != nil {
 		return err
 	}
@@ -632,7 +635,7 @@ func (hs *serverHandshakeStateGM) sendFinished(out []byte) error {
 // the public key of the leaf certificate.
 func (hs *serverHandshakeStateGM) processCertsFromClient(certificates [][]byte) (crypto.PublicKey, error) {
 	c := hs.c
-
+	log.Println("##################processCertsFromClient##################")
 	hs.certsFromClient = certificates
 	certs := make([]*x509.Certificate, len(certificates))
 	var err error
@@ -715,6 +718,7 @@ func (hs *serverHandshakeStateGM) setCipherSuite(id uint16, supportedCipherSuite
 }
 
 func (hs *serverHandshakeStateGM) clientHelloInfo() *ClientHelloInfo {
+	log.Println("##################clientHelloInfo##################")
 	if hs.cachedClientHelloInfo != nil {
 		return hs.cachedClientHelloInfo
 	}

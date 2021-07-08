@@ -8,7 +8,6 @@ package websocket
 
 import (
 	"github.com/whiskerman/gmsm/gmtls"
-	
 	//"crypto/tls"
 )
 
@@ -38,5 +37,6 @@ func cloneTLSConfig(cfg *gmtls.Config) *gmtls.Config {
 		MinVersion:               cfg.MinVersion,
 		MaxVersion:               cfg.MaxVersion,
 		CurvePreferences:         cfg.CurvePreferences,
+		GetKECertificate:         cfg.GetKECertificate,
 	}
 }

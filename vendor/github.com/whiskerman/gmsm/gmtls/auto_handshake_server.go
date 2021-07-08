@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -79,6 +80,7 @@ func (c *Conn) serverHandshakeAutoSwitch() error {
 // 			是否重用会话，true/false 重用/不重用
 //			错误信息
 func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, err error) {
+	fmt.Println("=========================begin processClientHelloGM===============")
 	if c.config.GetConfigForClient != nil {
 		if newConfig, err := c.config.GetConfigForClient(hs.clientHelloInfo()); err != nil {
 			_ = c.sendAlert(alertInternalError)
@@ -158,11 +160,14 @@ func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, e
 		_ = c.sendAlert(alertInternalError)
 		return false, err
 	}
+	log.Println("-1---get sigcert....")
+	log.Printf("-2---get config:\n%v\n", c.config)
 	encCert, err := c.config.GetKECertificate(hs.clientHelloInfo())
 	if err != nil {
 		_ = c.sendAlert(alertInternalError)
 		return false, err
 	}
+	log.Println("-3---get enccert....")
 	// GMT0024
 	if encCert == nil || sigCert == nil {
 		_ = c.sendAlert(alertInternalError)
@@ -174,7 +179,7 @@ func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, e
 	if hs.clientHello.scts {
 		hs.hello.scts = hs.cert[0].SignedCertificateTimestamps
 	}
-
+	log.Println("-4---before checkForResumption....")
 	if hs.checkForResumption() {
 		return true, nil
 	}
